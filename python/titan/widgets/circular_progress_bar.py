@@ -1,12 +1,11 @@
 
-from PySide2 import QtQuickWidgets, QtWidgets, QtCore, QtGui
 from typing import Union
 
-import sys
+from PySide2 import QtQuickWidgets, QtWidgets, QtCore, QtGui
 
 
-# TODO: Sort this out
-COMPONENT_PATH = "E:/dev/titan/qml/components/CircularProgressBar.qml"
+# Local Imports
+from titan.qml import get_component
 
 
 def color_as_hex(color: Union[str, QtGui.QColor]) -> str:
@@ -14,6 +13,9 @@ def color_as_hex(color: Union[str, QtGui.QColor]) -> str:
 
     Args:
         color (Union[str, QtGui.QColor]): The color to convert.
+    
+    Returns:
+        str: The color as a hex string.
     """
     if isinstance(color, QtGui.QColor):
         return color.name()
@@ -225,7 +227,7 @@ class CircularProgressBar(QtQuickWidgets.QQuickWidget):
 
         # TODO: Should we be able to resize this?
         #self.setResizeMode(QtQuickWidgets.QQuickWidget.SizeRootObjectToView)
-        self.setSource(QtCore.QUrl.fromLocalFile(COMPONENT_PATH))
+        self.setSource(QtCore.QUrl.fromLocalFile(get_component("CircularProgressBar")))
         if self.errors():
             for error in self.errors():
                 print(error)
@@ -247,16 +249,18 @@ EXAMPLE_WINDOW = None
 
 if __name__ == "__main__":
 
-    from functools import partial
     from maya import OpenMayaUI
     import shiboken2
+
+    """Example usage of the CircularProgressBar widget.
+    """
 
     ptr = OpenMayaUI.MQtUtil.mainWindow()
     handle = int(ptr)
     maya_window = shiboken2.wrapInstance(handle, QtWidgets.QWidget)
 
     EXAMPLE_WINDOW = QtWidgets.QWidget(parent=maya_window)
-    EXAMPLE_WINDOW.counter = 0
+    setattr(EXAMPLE_WINDOW, "counter", 0)
     layout = QtWidgets.QHBoxLayout(EXAMPLE_WINDOW)
 
     progress_bar = CircularProgressBar(parent=EXAMPLE_WINDOW)
