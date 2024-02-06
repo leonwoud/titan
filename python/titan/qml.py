@@ -1,5 +1,6 @@
 import os
 
+
 def get_component(component_name: str) -> str:
     """Get the file path to the given component.
     

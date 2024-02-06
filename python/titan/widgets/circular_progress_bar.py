@@ -253,6 +253,9 @@ if __name__ == "__main__":
     import shiboken2
 
     """Example usage of the CircularProgressBar widget.
+
+    >>> import titan.dgb
+    >>> titan.dbg.execfile("path/to/circular_progress_bar.py")
     """
 
     ptr = OpenMayaUI.MQtUtil.mainWindow()
@@ -264,6 +267,8 @@ if __name__ == "__main__":
     layout = QtWidgets.QHBoxLayout(EXAMPLE_WINDOW)
 
     progress_bar = CircularProgressBar(parent=EXAMPLE_WINDOW)
+    progress_bar.properties.progress_color = "violet"
+    progress_bar.properties.groove_size = 6
 
     layout.addWidget(progress_bar)
 
