@@ -1,4 +1,4 @@
-from titan._internal.dcc.maya import (
+from titan._internal.vendor.maya import (
     Maya,
     cmds,
     mel,
