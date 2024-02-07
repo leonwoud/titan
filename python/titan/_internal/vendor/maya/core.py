@@ -27,7 +27,12 @@ from typing import Optional
 
 # Local imports
 from titan.qt import QtWidgets
+from titan.logger import get_logger
 from titan._internal.vendor.maya.events import MayaEvent, EventCallbackManager
+
+
+# Create a logger
+LOGGER = get_logger("titan.vendor.maya.core")
 
 
 class _MayaAPI:

@@ -6,10 +6,15 @@ from typing import Any, Callable, Optional
 import weakref
 
 # Local imports
+from titan.logger import get_logger
 from titan.qt import QtCore
+
+# Create a logger
+LOGGER = get_logger("titan.vendor.maya.events")
 
 
 EventType = Enum("EventType", ("SceneEvent", "ActionEvent"))
+
 MayaEvent = Enum(
     "MayaEvent",
     (
@@ -99,7 +104,7 @@ class MayaEventManager(QtCore.QObject):
 
     def __init__(self):
         super(MayaEventManager, self).__init__()
-        from titan._internal.vendor.maya import OpenMaya  # Avoid cyclic import
+        from titan.vendor.maya import OpenMaya  # Avoid cyclic import
 
         # Connect the signals to the Maya events
         for event, data in _EVENT_MAP.items():
@@ -130,52 +135,78 @@ class MayaEventManager(QtCore.QObject):
 
 
 class EventCallback(QtCore.QObject):
+    """The EventCallback class is used to create a callback for a Maya event.
+    When the Maya event is triggered via MSceneMessage or MEventMessage, the callback
+    will be called. The callback can be any callable object, such as a function,
+    method, or lambda. The callback can also hold client data, which can be used to
+    pass data to the callback when it is called.
 
-    """The EventCallback class is used to create a callback for a Maya event. It is a
-    QObject so that it can be connected to a Maya event signal. When the event is
-    triggered, the callback will be called.
-    
-    It also holds reference to the caller info, so that it can be used to debug / track
-    usage of the callback."""
+    It also holds a reference to the caller info, so that it can be used to debug / track
+    usage of the callback.
+
+    Signals:
+        callback_deleted: A signal that is emitted when the callback is deleted.
+    """
 
     callback_deleted = QtCore.Signal(str)
 
     def __init__(
-        self, event: MayaEvent, callback: Callable, caller_info: inspect.Traceback, client_data: Any
+        self,
+        event: MayaEvent,
+        callback: Callable,
+        caller_info: inspect.Traceback,
+        client_data: Any,
     ):
         super(EventCallback, self).__init__()
         self._event = event
-        self._callback = weakref.proxy(callback, self.on_callback_deleted)
+        self._callback = weakref.WeakMethod(callback, self.on_callback_deleted)
+        self._callback_name = callback.__name__
         self._caller_info = caller_info
-        self._paused: bool = False
-        self._id = str(id(self))
+        self._enabled_state: bool = True
+        self._id: str = str(id(self))
         self._client_data = client_data
 
-    def __call__(self):
-        if self.callback and not self._paused:
+    def __call__(self, *args, **kwargs):
+        if self.callback and self.is_enabled:
             if self._client_data is not None:
-                return self.callback(self._client_data)
-            return self.callback()
+                return self.callback()(self._client_data)
+            return self.callback()()
 
     @QtCore.Slot()
-    def on_callback_deleted(self) -> None:
+    def on_callback_deleted(self, _: weakref.proxy) -> None:
+        """A slot that is called when the callback is deleted. This will emit the
+        callback_deleted signal."""
         self._callback = None
         self.callback_deleted.emit(self._id)
 
-    def pause(self, state) -> None:
-        self._paused = state
+    def set_enabled_state(self, state: bool) -> None:
+        """Set the enabled state of the callback."""
+        self._enabled_state = state
+
+    @property
+    def is_enabled(self):
+        """Return the enabled state of the callback."""
+        return self._enabled_state
 
     @property
     def callback(self) -> Callable:
+        """Return the callback function."""
         return self._callback
 
     @property
     def event(self) -> MayaEvent:
+        """Return the event that the callback is connected to."""
         return self._event
 
     @property
     def callback_id(self) -> str:
+        """Return the ID of the callback."""
         return self._id
+
+    @property
+    def callback_name(self) -> str:
+        """Return the name of the callback."""
+        return self._callback_name
 
 
 class EventCallbackManager:
@@ -205,7 +236,9 @@ class EventCallbackManager:
             cls._INSTANCE = cls()
         return cls._INSTANCE
 
-    def register_callback(self, event: MayaEvent, callback: Callable, client_data: Optional[Any] = None) -> int:
+    def register_callback(
+        self, event: MayaEvent, callback: Callable, client_data: Optional[Any] = None
+    ) -> int:
         """Create a new event callback for the given event and callback function.
 
         Args:
@@ -223,11 +256,28 @@ class EventCallbackManager:
         signal = MayaEventManager.get_event_signal(event)
         signal.connect(event_callback)
         self._CALLBACKS[event_callback.callback_id] = event_callback
+        LOGGER.debug(
+            "%s callback %s/%s.%s registered.",
+            event,
+            caller_info.filename,
+            caller_info.function,
+            callback.__name__,
+        )
         return event_callback.callback_id
 
-    def remove_callback(self, callback_id: str):
+    def remove_callback(self, callback_id: str) -> None:
+        """Remove the callback with the given ID.
+
+        Args:
+            callback_id (str): The ID of the callback to remove.
+        """
         if callback_id in self._CALLBACKS:
             event_callback = self._CALLBACKS[callback_id]
+            LOGGER.debug(
+                "%s callback %s removed.",
+                event_callback.event,
+                event_callback.callback_name,
+            )
             signal = MayaEventManager.get_event_signal(event_callback.event)
             signal.disconnect(event_callback)
             del self._CALLBACKS[callback_id]
