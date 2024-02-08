@@ -1,4 +1,4 @@
-from titan.vendor.maya import Maya
+from titan.host.maya import Maya
 
 
 class Example:

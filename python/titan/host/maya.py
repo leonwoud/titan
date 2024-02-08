@@ -1,4 +1,4 @@
-from titan._internal.vendor.maya import (
+from titan._internal.host.maya import (
     Maya,
     cmds,
     mel,
