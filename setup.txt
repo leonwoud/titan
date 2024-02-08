@@ -1,0 +1,23 @@
+
+OSX Maya scripts dir for typical install:
+    /Users/$USER/Library/Preferences/Autodesk/maya/scripts/
+
+Windows:
+
+Linux:
+    ~/maya/scripts
+
+
+""" userSetup.py
+
+import sys
+
+# TEMPORARY
+# Make sure maya doesn't write __pycache__
+sys.dont_write_bytecode = True
+
+
+if not "/path/to/titan/python/" in sys.path:
+    sys.path.append("/path/to/titan/python/")
+
+"""

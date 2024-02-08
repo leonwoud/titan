@@ -1,0 +1,3 @@
+
+- Temporarily set sys.dont_write_bytecode as titan init
+- Proper install/setup

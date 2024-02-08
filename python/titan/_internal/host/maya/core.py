@@ -13,7 +13,7 @@ This is so that you can import them directly from this module, like so:
     from titan.dcc.maya import cmds, mel...
 
 Or you can import the Maya module and access them from there:
-    from titan.vendor import Maya
+    from titan.host import Maya
     Maya.cmds...
 
 Either way, these modules are protected from being imported in an environment where Maya is not available.
@@ -28,11 +28,11 @@ from typing import Optional
 # Local imports
 from titan.qt import QtWidgets
 from titan.logger import get_logger
-from titan._internal.vendor.maya.events import MayaEvent, EventCallbackManager
+from titan._internal.host.maya.events import MayaEvent, EventCallbackManager
 
 
 # Create a logger
-LOGGER = get_logger("titan.vendor.maya.core")
+LOGGER = get_logger("titan.host.maya.core")
 
 
 class _MayaAPI:

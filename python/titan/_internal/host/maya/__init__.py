@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from .core import _MayaCore
+from titan._internal.host.maya.core import _MayaCore
 
 
 class Maya(metaclass=_MayaCore):
@@ -33,6 +33,8 @@ if IS_MAYA_AVAILABLE:
     OpenMayaAnim = Maya.api.openmayaanim
     OpenMayaRender = Maya.api.openmayarender
     OpenMaya_v1 = Maya.api.openmaya_v1
+    MayaEvent = Maya.events
+    EventManager = Maya.event_manager
 
 else:
     cmds = None
@@ -42,3 +44,5 @@ else:
     OpenMayaRender = None
     OpenMaya_v1 = None
     OpenMayaUI = None
+    MayaEvent = None
+    EventManager = None

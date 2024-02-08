@@ -7,6 +7,8 @@ from titan._internal.host.maya import (
     OpenMayaRender,
     OpenMaya_v1,
     OpenMayaUI,
+    MayaEvent,
+    EventManager,
     IS_MAYA_AVAILABLE,
 )
 
@@ -20,4 +22,6 @@ __all__ = (
     "OpenMayaRender",
     "OpenMaya_v1",
     "OpenMayaUI",
+    "MayaEvent",
+    "EventManager",
 )

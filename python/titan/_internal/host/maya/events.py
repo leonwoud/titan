@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 import inspect
+import types
 from typing import Any, Callable, Optional
 import weakref
 
@@ -10,7 +11,7 @@ from titan.logger import get_logger
 from titan.qt import QtCore
 
 # Create a logger
-LOGGER = get_logger("titan.vendor.maya.events")
+LOGGER = get_logger("titan.host.maya.events")
 
 
 EventType = Enum("EventType", ("SceneEvent", "ActionEvent"))
@@ -104,7 +105,7 @@ class MayaEventManager(QtCore.QObject):
 
     def __init__(self):
         super(MayaEventManager, self).__init__()
-        from titan.vendor.maya import OpenMaya  # Avoid cyclic import
+        from titan.host.maya import OpenMaya  # Avoid cyclic import
 
         # Connect the signals to the Maya events
         for event, data in _EVENT_MAP.items():
@@ -159,8 +160,13 @@ class EventCallback(QtCore.QObject):
     ):
         super(EventCallback, self).__init__()
         self._event = event
-        self._callback = weakref.WeakMethod(callback, self.on_callback_deleted)
         self._callback_name = callback.__name__
+        if isinstance(callback, types.MethodType):
+            class_name = callback.__self__.__class__.__name__
+            self._callback_name = f"{class_name}.{self._callback_name}"
+            self._callback = weakref.WeakMethod(callback, self.on_callback_deleted)
+        else:
+            self._callback = weakref.ref(callback, self.on_callback_deleted)
         self._caller_info = caller_info
         self._enabled_state: bool = True
         self._id: str = str(id(self))
@@ -256,13 +262,7 @@ class EventCallbackManager:
         signal = MayaEventManager.get_event_signal(event)
         signal.connect(event_callback)
         self._CALLBACKS[event_callback.callback_id] = event_callback
-        LOGGER.debug(
-            "%s callback %s/%s.%s registered.",
-            event,
-            caller_info.filename,
-            caller_info.function,
-            callback.__name__,
-        )
+        LOGGER.debug("%s callback %s registered.", event, event_callback.callback_name)
         return event_callback.callback_id
 
     def remove_callback(self, callback_id: str) -> None:
