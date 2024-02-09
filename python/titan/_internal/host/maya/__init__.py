@@ -1,5 +1,10 @@
 from __future__ import absolute_import
+
 from titan._internal.host.maya.core import _MayaCore
+
+from titan.logger import get_logger
+
+LOGGER = get_logger("titan.host.maya")
 
 
 class Maya(metaclass=_MayaCore):

@@ -22,6 +22,9 @@ You can test if Maya is available by checking the "IS_MAYA_AVAILABLE" constant o
 
 from __future__ import annotations
 
+import atexit
+import os
+import sys
 import types
 from typing import Optional
 
@@ -175,16 +178,17 @@ class _MayaUI:
 
 class _MayaCore(type):
 
-    def __init__(cls, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         # TODO: logger, so we can track when this module is first imported
-        cls._cmds: Optional[types.ModuleType] = None
-        cls._mel: Optional[types.ModuleType] = None
-        cls._ui: Optional[_MayaUI] = None
-        cls._api: Optional[_MayaAPI] = None
-        cls._events: MayaEvent = MayaEvent
-        cls._event_manager: Optional[EventCallbackManager] = None
-        cls._is_standalone: Optional[bool] = None
-        cls._is_available: Optional[bool] = None
+        self._cmds: Optional[types.ModuleType] = None
+        self._mel: Optional[types.ModuleType] = None
+        self._ui: Optional[_MayaUI] = None
+        self._api: Optional[_MayaAPI] = None
+        self._events: MayaEvent = MayaEvent
+        self._event_manager: Optional[EventCallbackManager] = None
+        self._is_standalone: Optional[bool] = None
+        self._is_available: Optional[bool] = None
+        atexit.register(self._cleanup)
 
     @property
     def cmds(self) -> types.ModuleType:
@@ -224,25 +228,33 @@ class _MayaCore(type):
 
     @property
     def is_standalone(self) -> bool:
-        """Return True if Maya is running in batch mode."""
+        """Return True if Maya is running in mayapy."""
         if self._is_standalone is None:
-            self._is_standalone = self.cmds.about(batch=True)
+            self._is_standalone = "mayapy" in os.path.basename(sys.executable)
         return self._is_standalone
 
     @property
+    def is_initialized(self) -> bool:
+        """Return True if Maya is initialized."""
+        try:
+            self.cmds.about(apiVersion=True)
+            return True
+        except AttributeError:
+            return False
+
+    @property
     def is_available(self) -> bool:
-        """Return True if Maya is available."""
+        """Return True if the maya api is available.
+
+        This returns True in a standalone or interactive Maya session.
+        """
         if self._is_available is None:
-            if not self.cmds:
-                self._is_available = False
+            if self.is_standalone:
+                self._is_available = True
+            elif "Maya" in os.path.basename(sys.executable):
+                self._is_available = True
             else:
-                # Catch the case where the cmds module is stubbed in
-                # the current environment.
-                try:
-                    self.cmds.about(batch=True)
-                    self._is_available = True
-                except AttributeError:
-                    self._is_available = False
+                self._is_available = False
         return self._is_available
 
     @property
@@ -256,3 +268,35 @@ class _MayaCore(type):
         if not self._event_manager:
             self._event_manager = EventCallbackManager.instance()
         return self._event_manager
+
+    def initialize(self):
+        """Initialize the Maya host.
+
+        Raises:
+            RuntimeError: If Maya is not available.
+        """
+        if not self.is_available:
+            raise RuntimeError("Maya is not available")
+
+        if self.is_standalone and not self.is_initialized:
+            import maya.standalone
+
+            maya.standalone.initialize()
+            self._is_standalone = True
+            self._is_available = True
+            LOGGER.info("Maya standalone initialized")
+
+    def _cleanup(self):
+        """Cleanup the Maya host."""
+        self._cmds = None
+        self._mel = None
+        self._ui = None
+        self._api = None
+        self._events = None
+        self._event_manager = None
+
+        if self.is_standalone and self.is_initialized:
+            import maya.standalone
+
+            maya.standalone.uninitialize()
+            LOGGER.info("Maya standalone uninitialized")
