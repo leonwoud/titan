@@ -3,6 +3,7 @@ OSX Maya scripts dir for typical install:
     /Users/$USER/Library/Preferences/Autodesk/maya/scripts/
 
 Windows:
+    C:\Users\$USER\[OneDrive]?\Documents\maya\scripts\
 
 Linux:
     ~/maya/scripts
