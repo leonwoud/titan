@@ -27,6 +27,7 @@ from typing import Optional
 
 # Local imports
 from titan.qt import QtWidgets
+
 from titan.logger import get_logger
 from titan._internal.host.maya.events import MayaEvent, EventCallbackManager
 
@@ -125,6 +126,8 @@ class _MayaUI:
     def is_available(self) -> bool:
         """Return True if Maya UI is available."""
         if not self._is_available:
+            import titan.host.maya as Maya
+
             if Maya.is_available:
                 self._is_available = not Maya.cmds.about(batch=True)
             else:
