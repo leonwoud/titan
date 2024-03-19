@@ -62,7 +62,7 @@ def find_resource(file_name: str) -> str:
         FileNotFoundError: If the resource does not exist.
     """
     resources_dir = get_resources_directory()
-    result = glob.glob(resources_dir + f"\**\{file_name}", recursive=True)
+    result = glob.glob(f"{resources_dir}{os.sep}**{os.sep}{file_name}", recursive=True)
 
     if len(result) > 1:
         raise AmbiguousResourceError(

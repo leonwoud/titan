@@ -93,6 +93,7 @@ class DocumentFitTextEdit(QtWidgets.QTextEdit):
         )
         self.setReadOnly(True)
 
+    @QtCore.Slot(QtCore.QSizeF)
     def _on_document_changed(self, size):
         self.setMaximumHeight(size.height() + 5)
 
@@ -111,6 +112,10 @@ class ElidingLineEdit(QtWidgets.QLineEdit):
             fm.elidedText(self._text, QtCore.Qt.ElideRight, event.size().width())
         )
         event.accept()
+
+    def sizeHint(self):
+        fm = QtGui.QFontMetrics(self.font())
+        return QtCore.QSize(fm.width(self._text), fm.height())
 
 
 class LogRecordInfo(QtWidgets.QWidget):
