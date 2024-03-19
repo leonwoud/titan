@@ -2,6 +2,8 @@
 This module provides a set of classes and functions to interact with Maya.
 """
 
+from titan._internal.host.maya.parser import FileInfoExtractor
+
 from titan._internal.host.maya import (
     Maya,
     cmds,
@@ -28,4 +30,5 @@ __all__ = (
     "OpenMayaUI",
     "MayaEvent",
     "EventManager",
+    "FileInfoExtractor",
 )

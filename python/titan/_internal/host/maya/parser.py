@@ -4,13 +4,15 @@ from contextlib import contextmanager
 import json
 import re
 
+from titan.logger import get_logger, log_execution_time
+
+LOGGER_NAME = "titan.host.maya.parser"
+
 
 @contextmanager
-def restore_handle_position(handle):
+def _restore_handle_position(handle):
     """A context manager to restore the position of a file handle after
-    reading from it. This is useful when reading bytes from a file handle
-    and you want to ensure the position of the handle is restored after
-    reading."""
+    reading from it."""
     offset = handle.tell()
     yield
     handle.seek(offset)
@@ -20,17 +22,26 @@ class FileInfoExtractor(object):
     """This class provides a set of methods to extract file info from Maya
     binary and ASCII files."""
 
+    ASCII_FILE_INFO = "fileInfo"
+    BINARY_FILE_INFO = b"FINF"
+    BINARY_FILE_HEADER = b"FOR8"
+
     @classmethod
+    @log_execution_time("titan.host.maya.parser")
     def get_file_info(cls, file_path):
         """Return a list of file info objects from the given file path. This
         method will check if the file is a Maya binary or ASCII file and
         extract the file info accordingly."""
         # Check if this is a Maya binary
+        log = get_logger(LOGGER_NAME)
+        log.debug("Opening %s", file_path)
         with open(file_path, "rb") as handle:
-            if cls._peek(handle, 4) == b"FOR8":
+            if cls._peek(handle, len(cls.BINARY_FILE_HEADER)) == cls.BINARY_FILE_HEADER:
+                log.trace(">> Extracting from Maya Binrary")
                 return cls._extract_file_info_binary(handle)
         # Do Maya ASCII extraction instead
         with open(file_path, "r") as handle:
+            log.trace(">> Extracting from Maya ASCII")
             return cls._extract_file_info_ascii(handle)
 
     @classmethod
@@ -42,7 +53,7 @@ class FileInfoExtractor(object):
         file_infos = []
         line = handle.readline()
         while line:
-            if line.startswith("fileInfo"):
+            if line.startswith(cls.ASCII_FILE_INFO):
                 file_infos.append(FileInfo.from_ascii(line))
                 if not found_file_info:
                     found_file_info = True
@@ -60,14 +71,14 @@ class FileInfoExtractor(object):
         start_offset = cls._find_file_info_start_offset(handle)
         assert start_offset != -1
         handle.seek(start_offset)
-        while cls._peek(handle, 4) == b"FINF":
+        while cls._peek(handle, 4) == cls.BINARY_FILE_INFO:
             file_infos.append(cls._parse_file_info(handle))
         return file_infos
 
     @staticmethod
     def _peek(handle, size):
         """Return the next "size" bytes from the file handle without"""
-        with restore_handle_position(handle):
+        with _restore_handle_position(handle):
             return handle.read(size)
 
     @staticmethod
@@ -93,7 +104,7 @@ class FileInfoExtractor(object):
         handle. This method will read the file handle and return the offset
         of the first file info chunk. If no file info chunk is found, -1
         will be returned."""
-        with restore_handle_position(handle):
+        with _restore_handle_position(handle):
             handle.seek(0)
             bytes = handle.read(4)
             while bytes:
@@ -102,6 +113,13 @@ class FileInfoExtractor(object):
                     return offset
                 bytes = handle.read(4)
         return -1
+
+
+def _printable_value(value):
+    """Returns a siccint version of a string with an undetermined length"""
+    if len(value) > 80:
+        return value[:80] + "..."
+    return value
 
 
 class FileInfo(object):
@@ -115,9 +133,12 @@ class FileInfo(object):
         super(FileInfo, self).__init__()
         self._label = label
         self._value = value
+        self._printable_value = _printable_value(value)
 
     def __repr__(self):
-        return "<File Info>: Label: {}, Value: {}".format(self._label, self._value)
+        return "<File Info>: Label: {}, Value: {}".format(
+            self._label, self._printable_value
+        )
 
     @classmethod
     def from_ascii(cls, line):
@@ -127,7 +148,10 @@ class FileInfo(object):
         line = line[:-1]
         tokenized = re.findall('(?:".*?"|\S)+', line)
         unpacked = [token[1:-1] for token in tokenized[1:]]
-        return cls(unpacked[0], unpacked[1])
+        inst = cls(unpacked[0], unpacked[1])
+        log = get_logger(LOGGER_NAME)
+        log.trace(">> %s" % inst)
+        return inst
 
     @classmethod
     def from_file_handle(cls, handle, size):
@@ -136,7 +160,10 @@ class FileInfo(object):
         object."""
         data = handle.read(size)
         unpacked = [bytes(b).decode("ascii") for b in data.split(b"\x00") if b]
-        return cls(unpacked[0], unpacked[1])
+        inst = cls(unpacked[0], unpacked[1])
+        log = get_logger(LOGGER_NAME)
+        log.trace(">> %s" % inst)
+        return inst
 
     @property
     def label(self):

@@ -24,7 +24,7 @@ class Maya(metaclass=_MayaCore):
         >>> # Result: False #
         >>> # Get the Maya main window
         >>> Maya.ui.main_window
-        >>> # Result: <PySide2.QtWidgets.QWidget(0x6000046dc600, name="MayaWindow") at 0x143378800>
+        >>> # Result: <PySide2.QtWidgets.QMainWindow(0x600006288f80, name="MayaWindow") at 0x2f9eba440>
     """
 
 

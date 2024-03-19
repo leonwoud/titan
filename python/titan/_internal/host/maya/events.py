@@ -11,7 +11,7 @@ from titan.logger import get_logger
 from titan.qt import QtCore
 
 # Create a logger
-LOGGER = get_logger("titan.host.maya.events")
+LOGGER_NAME = "titan.host.maya.events"
 
 
 EventType = Enum("EventType", ("SceneEvent", "ActionEvent"))
@@ -93,15 +93,6 @@ class MayaEventManager(QtCore.QObject):
     # the signals will not be available.
     for event in _EVENT_MAP:
         locals()[event.name] = QtCore.Signal(object)
-
-    def __new__(cls):
-        """Create a new instance of the MayaEventManager class. This is a singleton
-        class, so it will only create a new instance if one does not already
-        exist. Ideally this class should be created using the "instance" method. but
-        this __new__ method will safe guard against creating multiple instances."""
-        if not cls._INSTANCE:
-            cls._INSTANCE = super(MayaEventManager, cls).__new__(cls)
-        return cls._INSTANCE
 
     def __init__(self):
         super(MayaEventManager, self).__init__()
@@ -223,15 +214,6 @@ class EventCallbackManager:
     _INSTANCE = None
     _CALLBACKS = {}
 
-    def __new__(cls):
-        """Create a new instance of the EventCallbackManager class. This is a singleton
-        class, so it will only create a new instance if one does not already
-        exist. Ideally this class should be created using the "instance" method. but
-        this __new__ method will safe guard against creating multiple instances."""
-        if not cls._INSTANCE:
-            cls._INSTANCE = super(EventCallbackManager, cls).__new__(cls)
-        return cls._INSTANCE
-
     def __init__(self):
         super(EventCallbackManager, self).__init__()
 
@@ -262,7 +244,8 @@ class EventCallbackManager:
         signal = MayaEventManager.get_event_signal(event)
         signal.connect(event_callback)
         self._CALLBACKS[event_callback.callback_id] = event_callback
-        LOGGER.debug("%s callback %s registered.", event, event_callback.callback_name)
+        log = get_logger(LOGGER_NAME)
+        log.debug("%s callback %s registered.", event, event_callback.callback_name)
         return event_callback.callback_id
 
     def remove_callback(self, callback_id: str) -> None:
@@ -273,7 +256,8 @@ class EventCallbackManager:
         """
         if callback_id in self._CALLBACKS:
             event_callback = self._CALLBACKS[callback_id]
-            LOGGER.debug(
+            log = get_logger(LOGGER_NAME)
+            log.debug(
                 "%s callback %s removed.",
                 event_callback.event,
                 event_callback.callback_name,

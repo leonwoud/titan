@@ -1,0 +1,35 @@
+{
+    'name': 'titan.examples',
+    'msg': 'This is a test exception',
+    'args': (),
+    'levelname': 'ERROR',
+    'levelno': 40,
+    'pathname': '/Users/leonwoud/Desktop/titan/python/titan/examples.py',
+    'filename':
+    'examples.py',
+    'module':
+    'examples',
+    'exc_info': (<class 'ValueError'>, ValueError('This is a test exception'), <traceback object at 0x2eadecf40>),
+    'exc_text': 'Traceback (most recent call last):\n  File "/Users/leonwoud/Desktop/titan/python/titan/examples.py", line 20, in raise_excetion\n    Maya.events.SelectionChanged, self.selection_changed\nValueError: This is a test exception',
+    'stack_info': None,
+    'lineno': 22,
+    'funcName': 'raise_excetion',
+    'created': 1707809652.252106,
+    'msecs': 252.0,
+    'relativeCreated': 1573996.073961258,
+    'thread': 8011862016,
+    'threadName': 'MainThread',
+    'processName': 'MainProcess',
+    'process': 47544,
+    'message': 'This is a test exception',
+    'asctime': '2024-02-13 20:34:12,252'
+}
+
+"""
+Logger Name: name
+Time: asctime
+Messge: message
+Exception: <- exc_text (if applicable)
+Thread Name: threadName
+Process Name: processName
+"""
