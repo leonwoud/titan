@@ -1,8 +1,11 @@
 """ This module contains the main logger GUI components. 
 
+>>> # Open a serialized log file and display it in the logger GUI
+>>> from titan.resources import find_resource
 >>> from titan._internal.logger.gui.main import TitanLogger
 >>> gui_logger = TitanLogger("Example")
->>> gui_logger.load_log("../titan/log_examples.dat")
+>>> log_file = find_resource("log_examples.dat")
+>>> gui_logger.load_log(log_file)
 >>> gui_logger.show()
 
 """

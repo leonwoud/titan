@@ -1,8 +1,8 @@
-import logging
-from typing import Dict, Optional, Sequence, Text, Tuple
+from typing import Any, Dict, Optional, Sequence, Text, Tuple
 
 from titan.qt import QtCore, QtGui, QtWidgets
 from .header import Headers, Levels
+from .record import TitanLogRecord
 
 
 class FilterProxyModel(QtCore.QSortFilterProxyModel):
@@ -50,17 +50,17 @@ class FilterProxyModel(QtCore.QSortFilterProxyModel):
 
 class TitanLoggerModel(QtCore.QAbstractTableModel):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super(TitanLoggerModel, self).__init__(parent=parent)
         self._log_records = []
 
-    def rowCount(self, parent: QtCore.QModelIndex):
+    def rowCount(self, parent: QtCore.QModelIndex) -> int:
         return len(self._log_records)
 
-    def columnCount(self, parent: QtCore.QModelIndex):
+    def columnCount(self, parent: QtCore.QModelIndex) -> int:
         return len(Headers)
 
-    def data(self, index: QtCore.QModelIndex, role: int):
+    def data(self, index: QtCore.QModelIndex, role: int) -> Any:
 
         log_record = self._log_records[index.row()]
         level = log_record.level_name
@@ -77,7 +77,6 @@ class TitanLoggerModel(QtCore.QAbstractTableModel):
 
         elif role == QtCore.Qt.FontRole:
             font = QtGui.QFont("Courier New")
-            font.setPointSize(12)
             if level == Levels.Critical.level_name:
                 font.setBold(True)
             return font
@@ -106,16 +105,16 @@ class TitanLoggerModel(QtCore.QAbstractTableModel):
         if role == QtCore.Qt.DisplayRole and orientation == QtCore.Qt.Horizontal:
             return Headers(section).label
 
-    def add_log_record(self, record):
+    def add_log_record(self, record: TitanLogRecord) -> None:
         self._log_records.append(record)
         self.layoutChanged.emit()
 
-    def set_log_records(self, records):
+    def set_log_records(self, records: Sequence[TitanLogRecord]) -> None:
         self._log_records = records
         self.layoutChanged.emit()
 
-    def get_log_records(self):
+    def get_log_records(self) -> Sequence[TitanLogRecord]:
         return [record for record in self._log_records]
 
-    def get_log_record(self, index):
+    def get_log_record(self, index: int) -> TitanLogRecord:
         return self._log_records[index]

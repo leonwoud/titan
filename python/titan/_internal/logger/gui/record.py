@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Optional
+import logging
+from typing import Mapping, Optional
 
 from titan.qt import QtCore, QtGui, QtWidgets
 
@@ -7,7 +10,8 @@ from titan.qt import QtCore, QtGui, QtWidgets
 class TitanLogRecord:
 
     @classmethod
-    def from_record(cls, record):
+    def from_record(cls, record: logging.LogRecord) -> TitanLogRecord:
+        """Create a TitanLogRecord from a logging.LogRecord."""
         inst = cls()
         inst.created = record.created
         inst.time_str = datetime.fromtimestamp(record.created).strftime(
@@ -26,6 +30,7 @@ class TitanLogRecord:
         return inst
 
     def __str__(self):
+        """Return a string representation of the log record."""
         return f"{self.time_str} : {self.level_name} : {self.name} : {self.msg}"
 
     def __init__(self):
@@ -42,7 +47,8 @@ class TitanLogRecord:
         self.func: Optional[str] = None
         self.exc_text: Optional[str] = None
 
-    def as_dict(self):
+    def as_dict(self) -> Mapping[str, str]:
+        """Return the log record as a dictionary."""
         return {
             "created": self.created,
             "time_str": self.time_str,
@@ -59,7 +65,8 @@ class TitanLogRecord:
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: Mapping[str, str]) -> TitanLogRecord:
+        """Create a TitanLogRecord from a dictionary."""
         inst = cls()
         inst.created = data["created"]
         inst.time_str = data["time_str"]
@@ -77,8 +84,9 @@ class TitanLogRecord:
 
 
 class DocumentFitTextEdit(QtWidgets.QTextEdit):
+    """A QTextEdit that resizes to fit the document size."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super(DocumentFitTextEdit, self).__init__(parent=parent)
         self.document().documentLayout().documentSizeChanged.connect(
             self._on_document_changed
@@ -90,8 +98,9 @@ class DocumentFitTextEdit(QtWidgets.QTextEdit):
 
 
 class ElidingLineEdit(QtWidgets.QLineEdit):
+    """A QLineEdit that elides the text when it is too long."""
 
-    def __init__(self, text, parent=None):
+    def __init__(self, text, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super(ElidingLineEdit, self).__init__(text, parent=parent)
         self._text = text
         self.setReadOnly(True)
@@ -120,7 +129,7 @@ class LogRecordInfo(QtWidgets.QWidget):
         main_layout.addLayout(layout)
         # Date
         date_txt = datetime.fromtimestamp(record.created).strftime(
-            "%-I:%M:%S%p %A, %d %B %Y"
+            "%I:%M:%S%p %A, %d %B %Y"
         )
         time = ElidingLineEdit(date_txt, self)
         layout.addRow("Time:", time)
@@ -148,12 +157,14 @@ class LogRecordInfo(QtWidgets.QWidget):
             exc_text = DocumentFitTextEdit(self)
             exc_text.setPlainText(record.exc_text)
             layout.addRow("Traceback:", exc_text)
+        # TODO: Can we do without stylesheet?
         self.setStyleSheet(
             "QLineEdit,QTextEdit { border: 0px; background: transparent; font-family: Courier New}"
         )
         main_layout.addStretch()
 
     def closeEvent(self, event: QtCore.QEvent) -> None:
+        """Emit the on_closed signal when the widget is closed."""
         self.on_closed.emit(self)
         event.accept()
         super(LogRecordInfo, self).closeEvent(event)
