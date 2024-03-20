@@ -1,0 +1,17 @@
+[GroupBox]
+    - title "Interface: General Interface Preferences"
+    - collapsable True
+    [GroupBox]
+        - title "Home Screen"
+        - disable { "showHomeScreen" == 0 }
+        [CheckBox]
+            - label "Show Home Screen on start up"
+            - key "showHomeScreen"
+            - default true
+        [CheckBox]
+            - label "Show Home icon in menu bar"
+            - key "showHomeIcon"
+            - default false
+        [ColorPicker]
+            - label "colour"
+            - default "#FFF000"

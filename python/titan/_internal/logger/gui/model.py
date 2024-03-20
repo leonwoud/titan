@@ -55,13 +55,15 @@ class TitanLoggerModel(QtCore.QAbstractTableModel):
         self._log_records = []
 
     def rowCount(self, parent: QtCore.QModelIndex) -> int:
+        """Return the number of rows in the model."""
         return len(self._log_records)
 
     def columnCount(self, parent: QtCore.QModelIndex) -> int:
+        """Return the number of columns in the model."""
         return len(Headers)
 
     def data(self, index: QtCore.QModelIndex, role: int) -> Any:
-
+        """Return the data for the given index and role."""
         log_record = self._log_records[index.row()]
         level = log_record.level_name
 
@@ -95,26 +97,31 @@ class TitanLoggerModel(QtCore.QAbstractTableModel):
             elif level == Levels.Info.level_name:
                 return QtGui.QColor("ghostwhite")
             elif level == Levels.Debug.level_name:
-                return QtGui.QColor("limegreen")
+                return QtGui.QColor("lightgrey")
             elif level == Levels.Trace.level_name:
                 return QtGui.QColor("mediumorchid")
 
     def headerData(
         self, section: int, orientation: QtCore.Qt.Orientation, role: int
     ) -> None:
+        """Return the header data for the given section, orientation, and role."""
         if role == QtCore.Qt.DisplayRole and orientation == QtCore.Qt.Horizontal:
             return Headers(section).label
 
     def add_log_record(self, record: TitanLogRecord) -> None:
+        """Add a log record to the model."""
         self._log_records.append(record)
         self.layoutChanged.emit()
 
     def set_log_records(self, records: Sequence[TitanLogRecord]) -> None:
+        """Set the log records for the model."""
         self._log_records = records
         self.layoutChanged.emit()
 
     def get_log_records(self) -> Sequence[TitanLogRecord]:
+        """Return the log records."""
         return [record for record in self._log_records]
 
     def get_log_record(self, index: int) -> TitanLogRecord:
+        """Return the log record at the given index."""
         return self._log_records[index]

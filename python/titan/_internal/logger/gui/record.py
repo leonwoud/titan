@@ -94,7 +94,8 @@ class DocumentFitTextEdit(QtWidgets.QTextEdit):
         self.setReadOnly(True)
 
     @QtCore.Slot(QtCore.QSizeF)
-    def _on_document_changed(self, size):
+    def _on_document_changed(self, size: QtCore.QSizeF):
+        """Resize the widget to fit the document size."""
         self.setMaximumHeight(size.height() + 5)
 
 
@@ -106,7 +107,8 @@ class ElidingLineEdit(QtWidgets.QLineEdit):
         self._text = text
         self.setReadOnly(True)
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event: QtCore.QEvent) -> None:
+        """Resize the text to fit the widget."""
         fm = QtGui.QFontMetrics(self.font())
         self.setText(
             fm.elidedText(self._text, QtCore.Qt.ElideRight, event.size().width())
@@ -114,6 +116,7 @@ class ElidingLineEdit(QtWidgets.QLineEdit):
         event.accept()
 
     def sizeHint(self):
+        """Return the size hint for the widget."""
         fm = QtGui.QFontMetrics(self.font())
         return QtCore.QSize(fm.width(self._text), fm.height())
 
@@ -126,10 +129,13 @@ class LogRecordInfo(QtWidgets.QWidget):
         self, record: TitanLogRecord, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
         super(LogRecordInfo, self).__init__(parent=parent)
-        self.setWindowTitle("Titan Log Record")
+        self.setWindowFlags(
+            QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup
+        )
         main_layout = QtWidgets.QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         layout = QtWidgets.QFormLayout()
+        layout.setContentsMargins(5, 5, 5, 5)
         layout.setLabelAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTop)
         main_layout.addLayout(layout)
         # Date
@@ -164,12 +170,26 @@ class LogRecordInfo(QtWidgets.QWidget):
             layout.addRow("Traceback:", exc_text)
         # TODO: Can we do without stylesheet?
         self.setStyleSheet(
-            "QLineEdit,QTextEdit { border: 0px; background: transparent; font-family: Courier New}"
+            "QLineEdit,QTextEdit { border: 0px; background: transparent; font-family: Courier New }"
         )
         main_layout.addStretch()
+        self._resize_handle = QtWidgets.QSizeGrip(self)
+        main_layout.addWidget(
+            self._resize_handle, alignment=QtCore.Qt.AlignBottom | QtCore.Qt.AlignRight
+        )
 
     def closeEvent(self, event: QtCore.QEvent) -> None:
         """Emit the on_closed signal when the widget is closed."""
         self.on_closed.emit(self)
-        event.accept()
         super(LogRecordInfo, self).closeEvent(event)
+
+    def showEvent(self, event: QtCore.Event) -> None:
+        """Adjust the size of the widget to fit the contents."""
+        super(LogRecordInfo, self).showEvent(event)
+        # This is a bit of a hack, we have to call adjustSize twice
+        # I believe it's because of the addStretch in the main
+        # VBoxLayout, but if we don't have that, the FormLayout
+        # expands to fill the entire widget and I can't seem to
+        # constrain that behavior.
+        self.adjustSize()
+        self.adjustSize()

@@ -54,7 +54,7 @@ class TitanLogger(QtWidgets.QWidget):
         self._init_ui()
         self._record_infos = []
 
-    def _init_ui(self):
+    def _init_ui(self) -> None:
         """Initialize the UI."""
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -72,6 +72,8 @@ class TitanLogger(QtWidgets.QWidget):
         self._copy_action.setShortcut(QtGui.QKeySequence.Copy)
         self.addAction(self._copy_action)
 
+        self.setStyleSheet("QTableView {border: 2px solid transparent;}")
+
     @QtCore.Slot()
     def _on_copy(self) -> None:
         """Copy the selected rows to the clipboard."""
@@ -80,14 +82,12 @@ class TitanLogger(QtWidgets.QWidget):
     @QtCore.Slot(QtCore.QModelIndex)
     def _on_double_click(self, index: QtCore.QModelIndex) -> None:
         """Show the log record info when a row is double clicked."""
-        mouse_pos = self.mapFromGlobal(QtGui.QCursor.pos())
-        row = self._proxy_model.mapToSource(index).row()
-        record = self._table_model.get_log_record(row)
-        info = LogRecordInfo(record)
+        record_index = self._proxy_model.mapToSource(index).row()
+        record = self._table_model.get_log_record(record_index)
+        info = LogRecordInfo(record, parent=self)
         self._record_infos.append(info)
         info.on_closed.connect(self._on_info_closed)
-        info.move(mouse_pos)
-        info.resize(info.sizeHint())
+        info.move(QtGui.QCursor.pos())
         info.show()
 
     @QtCore.Slot(TitanLogRecord)

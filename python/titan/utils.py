@@ -1,8 +1,13 @@
+from __future__ import annotations
+
+from typing import Callable
+
+
 class _MetaDummyClass(type):
     """A metaclass that allows DummyClass to be used as a stand-in for any
     class that is not available in the current environment."""
 
-    def __getattr__(cls, name):
+    def __getattr__(cls, name: str) -> Callable[..., DummyClass]:
         return DummyClass
 
 
@@ -11,10 +16,10 @@ class DummyClass(metaclass=_MetaDummyClass):
     available in the current environment.
     """
 
-    def __init__(*args, **kwargs):
+    def __init__(*args, **kwargs) -> None:
         pass
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> DummyClass:
         return self
 
 
@@ -25,11 +30,11 @@ def dummy_function(*args, **kwargs):
     pass
 
 
-def dummy_decorator(fn):
+def dummy_decorator(fn: Callable) -> Callable:
     """A dummy decorator that can be used to replace any decorator that is not
     available in the current environment."""
 
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, **kwargs) -> Callable:
         return fn(*args, **kwargs)
 
     return wrapper
