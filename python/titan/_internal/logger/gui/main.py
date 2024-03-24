@@ -11,7 +11,7 @@
 """
 
 import logging
-from typing import Mapping, Optional
+from typing import Optional
 
 from .model import TitanLoggerModel, FilterProxyModel
 from .record import TitanLogRecord, LogRecordInfo
@@ -24,7 +24,7 @@ from titan.qt import QtCore, QtGui, QtWidgets
 
 
 # Constants
-LOGGER_MODELS: Mapping[str, TitanLoggerModel] = {}
+LOGGER_MODELS: dict[str, TitanLoggerModel] = {}
 SHARED_LOGGER_MODEL: TitanLoggerModel = None
 
 
@@ -47,7 +47,7 @@ class TitanLogger(QtWidgets.QWidget):
     def __init__(
         self, name: Optional[str] = None, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
-        super(TitanLogger, self).__init__(parent=parent)
+        super().__init__(parent=parent)
         self._table_view = None
         self._tabel_model = None
         self._name = name
@@ -104,12 +104,18 @@ class TitanLogger(QtWidgets.QWidget):
         """Loads the log records from a file."""
         self._table_model.set_log_records(read_records(file_path))
 
+    def closeEvent(self, event: QtCore.QEvent) -> None:
+        """Close the log records when the logger is closed."""
+        for info in self._record_infos:
+            info.close()
+        event.accept()
+
 
 class TitanLogHandler(logging.Handler):
     """A logging handler that emits signals to the LoggingGUIModel"""
 
     def __init__(self, model, *args, **kwargs):
-        super(TitanLogHandler, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._model = model
 
     def emit(self, record: logging.LogRecord) -> None:

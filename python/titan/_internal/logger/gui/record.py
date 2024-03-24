@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
-from typing import Mapping, Optional
+from typing import Optional
 
 from titan.qt import QtCore, QtGui, QtWidgets
 
@@ -47,7 +47,7 @@ class TitanLogRecord:
         self.func: Optional[str] = None
         self.exc_text: Optional[str] = None
 
-    def as_dict(self) -> Mapping[str, str]:
+    def as_dict(self) -> dict[str, str]:
         """Return the log record as a dictionary."""
         return {
             "created": self.created,
@@ -65,7 +65,7 @@ class TitanLogRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, str]) -> TitanLogRecord:
+    def from_dict(cls, data: dict[str, str]) -> TitanLogRecord:
         """Create a TitanLogRecord from a dictionary."""
         inst = cls()
         inst.created = data["created"]
@@ -87,7 +87,7 @@ class DocumentFitTextEdit(QtWidgets.QTextEdit):
     """A QTextEdit that resizes to fit the document size."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
-        super(DocumentFitTextEdit, self).__init__(parent=parent)
+        super().__init__(parent=parent)
         self.document().documentLayout().documentSizeChanged.connect(
             self._on_document_changed
         )
@@ -103,7 +103,7 @@ class ElidingLineEdit(QtWidgets.QLineEdit):
     """A QLineEdit that elides the text when it is too long."""
 
     def __init__(self, text, parent: Optional[QtWidgets.QWidget] = None) -> None:
-        super(ElidingLineEdit, self).__init__(text, parent=parent)
+        super().__init__(text, parent=parent)
         self._text = text
         self.setReadOnly(True)
 
@@ -128,7 +128,7 @@ class LogRecordInfo(QtWidgets.QWidget):
     def __init__(
         self, record: TitanLogRecord, parent: Optional[QtWidgets.QWidget] = None
     ) -> None:
-        super(LogRecordInfo, self).__init__(parent=parent)
+        super().__init__(parent=parent)
         self.setWindowFlags(
             QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup
         )
@@ -181,11 +181,11 @@ class LogRecordInfo(QtWidgets.QWidget):
     def closeEvent(self, event: QtCore.QEvent) -> None:
         """Emit the on_closed signal when the widget is closed."""
         self.on_closed.emit(self)
-        super(LogRecordInfo, self).closeEvent(event)
+        super().closeEvent(event)
 
     def showEvent(self, event: QtCore.Event) -> None:
         """Adjust the size of the widget to fit the contents."""
-        super(LogRecordInfo, self).showEvent(event)
+        super().showEvent(event)
         # This is a bit of a hack, we have to call adjustSize twice
         # I believe it's because of the addStretch in the main
         # VBoxLayout, but if we don't have that, the FormLayout

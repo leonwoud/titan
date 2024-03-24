@@ -22,7 +22,7 @@ class TitanLoggerView(QtWidgets.QTableView):
     filter_changed = QtCore.Signal(int, list)
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
-        super(TitanLoggerView, self).__init__(parent=parent)
+        super().__init__(parent=parent)
         horiztonal_header = TitanLoggerFilterHeaderView(QtCore.Qt.Horizontal, self)
         horiztonal_header.setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
         self.create_filters(horiztonal_header)

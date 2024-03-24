@@ -1,11 +1,10 @@
 import json
-from typing import Sequence
 import zlib
 
 from .record import TitanLogRecord
 
 
-def write_records(log_records: Sequence[TitanLogRecord], filename: str):
+def write_records(log_records: list[TitanLogRecord], filename: str):
     """Write log records to a file.
 
     Args:
@@ -18,7 +17,7 @@ def write_records(log_records: Sequence[TitanLogRecord], filename: str):
         handle.write(zlib.compress(bytes_))
 
 
-def read_records(filename: str) -> Sequence[TitanLogRecord]:
+def read_records(filename: str) -> list[TitanLogRecord]:
     """Read log records from a file.
 
     Args:

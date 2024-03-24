@@ -130,7 +130,7 @@ class FileInfo(object):
     object. The value can be converted to a JSON object using the value_as_json"""
 
     def __init__(self, label, value):
-        super(FileInfo, self).__init__()
+        super().__init__()
         self._label = label
         self._value = value
         self._printable_value = _printable_value(value)

@@ -95,7 +95,7 @@ class MayaEventManager(QtCore.QObject):
         locals()[event.name] = QtCore.Signal(object)
 
     def __init__(self):
-        super(MayaEventManager, self).__init__()
+        super().__init__()
         from titan.host.maya import OpenMaya  # Avoid cyclic import
 
         # Connect the signals to the Maya events
@@ -149,7 +149,7 @@ class EventCallback(QtCore.QObject):
         caller_info: inspect.Traceback,
         client_data: Any,
     ):
-        super(EventCallback, self).__init__()
+        super().__init__()
         self._event = event
         self._callback_name = callback.__name__
         if isinstance(callback, types.MethodType):
@@ -215,7 +215,7 @@ class EventCallbackManager:
     _CALLBACKS = {}
 
     def __init__(self):
-        super(EventCallbackManager, self).__init__()
+        super().__init__()
 
     @classmethod
     def instance(cls: EventCallbackManager) -> EventCallbackManager:

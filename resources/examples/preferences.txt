@@ -1,17 +1,68 @@
+[Settings]
+    - name settings
+    - scope QtCore.QSettings.UserScope
+    - application titan.test
+    - organization home
+
 [GroupBox]
-    - title "Interface: General Interface Preferences"
-    - collapsable True
+    - name general
+    - label "Interface: General Interface Preferences"
+    - collapsible true
+
+    [Field]
+        - name field
+        - label "String Field"
+        - type str
+        - default hello
+
+    [Field]
+        - name intField
+        - label "Int Field"
+        - type int
+        - default 10
+    
+    [Field]
+        - name floatField
+        - label "Float Field"
+        - type float
+        - default 3.14
+
     [GroupBox]
-        - title "Home Screen"
-        - disable { "showHomeScreen" == 0 }
+        - name home
+        - label "Home Screen"
+        - disable { showHomeScreen == 0 }
+        - tooltip """this is a tooltip that we'll let run long and over 
+            multiple lines, but we need to read back as one"""
+
         [CheckBox]
+            - name showHomeScreen
             - label "Show Home Screen on start up"
-            - key "showHomeScreen"
             - default true
+
         [CheckBox]
+            - name showHomeIcon
             - label "Show Home icon in menu bar"
-            - key "showHomeIcon"
             - default false
+
         [ColorPicker]
-            - label "colour"
+            - name colorPicker1
+            - label colour
             - default "#FFF000"
+
+    [CheckBox]
+        - name bottom
+        - label "Bottom Checkbox"
+        - default false
+
+    [ComboBox]
+        - name combo
+        - label something
+        - default value3
+        - type str
+
+        [Item]
+            - name value1
+        [Item]
+            - name "value2 (test)"
+        [Item]
+            - name value3

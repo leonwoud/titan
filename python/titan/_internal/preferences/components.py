@@ -1,0 +1,225 @@
+from __future__ import annotations
+
+from typing import Optional
+
+from titan.qt import QtCore
+from .parser import PreferenceNode
+
+
+class Component:
+
+    DataTypes = {
+        "int": int,
+        "str": str,
+        "float": float,
+        "bool": bool,
+        "list": list,
+        "dict": dict,
+    }
+
+    def __init__(self, name: str, path: str, label: Optional[str] = None):
+        self.name = name
+        self.path = path
+        self.label = label
+
+    @classmethod
+    def validate(self, node: PreferenceNode) -> bool:
+        """Validate the preference node contains the required attributes for this
+        component and/or create the missing attributes if applicable."""
+        # Label is optional, if it does not exist, we will default to None
+        if not hasattr(node, "label"):
+            node.add_property("label", None)
+
+        if not hasattr(node, "name"):
+            raise ValueError(
+                f"{node.node_type} ({node.name}) node must have a name attribute."
+            )
+        if not hasattr(node, "default"):
+            raise ValueError(
+                f"{node.node_type} ({node.name}) must have a default attribute."
+            )
+
+    @classmethod
+    def from_preference_node(cls, node: PreferenceNode) -> Component:
+        """Create a component from a preference node."""
+        cls.validate(node)
+
+
+class Settings(Component):
+
+    def __init__(self, name, scope, application, organization):
+        super().__init__(name, None, None)
+        self.scope = self._get_scope(scope)
+        self.application = application
+        self.organization = organization
+
+    @staticmethod
+    def _get_scope(scope: str) -> QtCore.QSettings.Scope:
+        """Get the QSettings scope from a string."""
+        _scope = QtCore
+        for attr in scope.split(".")[1:]:
+            _scope = getattr(_scope, attr)
+        return _scope
+
+    @classmethod
+    def validate(cls, node: PreferenceNode):
+
+        # Add the scope attribute if it does not exist, we will default to UserScope
+        if not hasattr(node, "scope"):
+            node.add_property("scope", "QtCore.QSettings.UserScope")
+
+        # Try to get the scope attribute, if it fails, raise an error
+        try:
+            cls._get_scope(node.scope)
+        except AttributeError:
+            raise ValueError(f"Invalid QSettings scope attribute: {node.scope}")
+
+        if not hasattr(node, "application"):
+            raise ValueError(
+                "Settings '{node.name}' must have an application attribute."
+            )
+
+        if not hasattr(node, "organization"):
+            raise ValueError(
+                "Settings '{node.name}' must have an organization attribute."
+            )
+
+    @classmethod
+    def from_preference_node(cls, node: PreferenceNode):
+        # default and name properties aren't needed for the Settings component
+        # If they're not given, it shouldn't fail.
+        if not hasattr(node, "default"):
+            node.add_property("default", None)
+        if not hasattr(node, "name"):
+            node.add_property("name", None)
+        super(Settings, cls).from_preference_node(node)
+        return cls(node.name, node.scope, node.application, node.organization)
+
+
+class Field(Component):
+
+    def __init__(
+        self,
+        name: str,
+        path: str,
+        data_type: str,
+        default: str,
+        label: Optional[str] = None,
+    ):
+        super().__init__(name, path, label=label)
+        self.data_type = self.DataTypes.get(data_type)
+        self.default = self.data_type(default)
+
+    @classmethod
+    def validate(cls, node: PreferenceNode):
+        super(Field, cls).validate(node)
+        if not hasattr(node, "type"):
+            raise ValueError(f"Field '{node.name}' must have a type attribute.")
+
+        # Validate we can convert the default value to the specified data type
+        data_type = cls.DataTypes.get(node.type)
+        try:
+            data_type(node.default)
+        except ValueError:
+            raise ValueError(f"Invalid default value for field {node.name}")
+
+    @classmethod
+    def from_preference_node(cls, node: PreferenceNode):
+        super(Field, cls).from_preference_node(node)
+        return cls(node.name, node.get_path(), node.type, node.default)
+
+
+class CheckBox(Component):
+
+    def __init__(self, name: str, path: str, default: str, label: Optional[str] = None):
+        super().__init__(name, path, label=label)
+        self.default = as_bool(default)
+
+    @classmethod
+    def validate(cls, node: PreferenceNode):
+        super(CheckBox, cls).validate(node)
+
+    @classmethod
+    def from_preference_node(cls, node: PreferenceNode):
+        super(CheckBox, cls).validate(node)
+        return cls(node.name, node.get_path(), node.default)
+
+
+class ColorPicker(Component):
+
+    def __init__(self, name: str, path: str, default: str, label: Optional[str] = None):
+        super().__init__(name, path, label=label)
+        self.default = default
+
+    @classmethod
+    def from_preference_node(cls, node: PreferenceNode):
+        super(ColorPicker, cls).from_preference_node(node)
+        return cls(node.name, node.get_path(), node.default)
+
+
+class ComboBox(Component):
+
+    def __init__(
+        self,
+        name: str,
+        path: str,
+        data_type: str,
+        items: list[str],
+        default: str,
+        label: Optional[str] = None,
+    ):
+        super().__init__(name, path, label=label)
+        self.data_type = self.DataTypes.get(data_type)
+        self.default = self.data_type(default)
+        self._items = []
+        for item in items:
+            self._items.append(self.data_type(item))
+
+    def items(self) -> list:
+        return [item for item in self._items]
+
+    @classmethod
+    def validate(cls, node: PreferenceNode):
+        super(ComboBox, cls).validate(node)
+        if not node.children:
+            raise ValueError(f"ComboBox '{node.name}' node must have at least one item")
+        if not hasattr(node, "type"):
+            raise ValueError(f"ComboBox '{node.name}' node must have a type attribute.")
+
+        # Validate we can convert the default value to the specified data type
+        data_type = cls.DataTypes.get(node.type)
+        try:
+            data_type(node.default)
+        except ValueError:
+            raise ValueError(f"Invalid default value for ComboBox '{node.name}'")
+
+    @classmethod
+    def from_preference_node(cls, node: PreferenceNode):
+        super(ComboBox, cls).from_preference_node(node)
+        items = [child.name for child in node.children]
+        return cls(
+            node.name, node.get_path(), node.type, items, node.default, label=node.label
+        )
+
+
+def as_bool(value: str) -> bool:
+    """Convert a string to a boolean."""
+    if value.lower() in ("true", "1"):
+        return True
+    return False
+
+
+def from_preference_node(node: PreferenceNode) -> Component:
+    """Factory function to create a component from a preference node."""
+    if node.node_type == "Settings":
+        return Settings.from_preference_node(node)
+    elif node.node_type == "Field":
+        return Field.from_preference_node(node)
+    elif node.node_type == "CheckBox":
+        return CheckBox.from_preference_node(node)
+    elif node.node_type == "ColorPicker":
+        return ColorPicker.from_preference_node(node)
+    elif node.node_type == "ComboBox":
+        return ComboBox.from_preference_node(node)
+
+    raise NotImplementedError(f"Component type {node.node_type} is not supported.")

@@ -1,7 +1,6 @@
 from enum import IntEnum
 from functools import partial
 import logging
-from typing import Tuple
 
 from titan.qt import QtCore, QtWidgets
 from .filters import TextFilter, DropDownFilter
@@ -49,7 +48,7 @@ class Levels(IntEnum):
     Critical = (logging.CRITICAL, "CRITICAL")
 
 
-def split_seq(value: str) -> Tuple[str]:
+def split_seq(value: str) -> tuple[str]:
     """Splits comma-separated values into a sequence."""
     values = (x.strip() for x in value.split(","))
     return tuple(x for x in values if x)
@@ -64,7 +63,7 @@ class TitanLoggerFilterHeaderView(QtWidgets.QHeaderView):
     def __init__(
         self, orientation: QtCore.Qt.Orientation, parent: QtWidgets.QWidget
     ) -> None:
-        super(TitanLoggerFilterHeaderView, self).__init__(orientation, parent)
+        super().__init__(orientation, parent)
         self._filters = []
         self._padding = 2
         self.setStretchLastSection(True)
@@ -77,7 +76,7 @@ class TitanLoggerFilterHeaderView(QtWidgets.QHeaderView):
 
     def sizeHint(self) -> int:
         """Returns the size hint for the header view."""
-        size = super(TitanLoggerFilterHeaderView, self).sizeHint()
+        size = super().sizeHint()
         if self._filters:
             height = self._filters[0].sizeHint().height()
             size.setHeight(size.height() + height + self._padding * 2)
@@ -90,7 +89,7 @@ class TitanLoggerFilterHeaderView(QtWidgets.QHeaderView):
             self.setViewportMargins(0, self._padding, 0, height + self._padding)
         else:
             self.setViewportMargins(0, 0, 0, 0)
-        super(TitanLoggerFilterHeaderView, self).updateGeometries()
+        super().updateGeometries()
         self.adjust_positions()
 
     def adjust_positions(self) -> None:

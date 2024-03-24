@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Sequence, Text, Tuple
+from typing import Any, Optional
 
 from titan.qt import QtCore, QtGui, QtWidgets
 from .header import Headers, Levels
@@ -9,10 +9,10 @@ class FilterProxyModel(QtCore.QSortFilterProxyModel):
     """Filter Proxy Model for the logger view."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
-        super(FilterProxyModel, self).__init__(parent=parent)
-        self._filters: Dict[int, Tuple[Text, ...]] = {}
+        super().__init__(parent=parent)
+        self._filters: dict[int, tuple[str, ...]] = {}
 
-    def set_filter(self, col: int, values: Sequence[Text]) -> None:
+    def set_filter(self, col: int, values: list[str]) -> None:
         """Sets the filter values for the given column."""
         if values:
             self._filters[col] = tuple(values)
@@ -51,7 +51,7 @@ class FilterProxyModel(QtCore.QSortFilterProxyModel):
 class TitanLoggerModel(QtCore.QAbstractTableModel):
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
-        super(TitanLoggerModel, self).__init__(parent=parent)
+        super().__init__(parent=parent)
         self._log_records = []
 
     def rowCount(self, parent: QtCore.QModelIndex) -> int:
@@ -113,12 +113,12 @@ class TitanLoggerModel(QtCore.QAbstractTableModel):
         self._log_records.append(record)
         self.layoutChanged.emit()
 
-    def set_log_records(self, records: Sequence[TitanLogRecord]) -> None:
+    def set_log_records(self, records: list[TitanLogRecord]) -> None:
         """Set the log records for the model."""
         self._log_records = records
         self.layoutChanged.emit()
 
-    def get_log_records(self) -> Sequence[TitanLogRecord]:
+    def get_log_records(self) -> list[TitanLogRecord]:
         """Return the log records."""
         return [record for record in self._log_records]
 
