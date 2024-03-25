@@ -3,16 +3,6 @@ from typing import Optional
 
 from titan.qt import QtWidgets, QtGui, QtCore
 
-"""
-import titan.widgets.collapsible_container
-import imp
-imp.reload(titan.widgets.collapsible_container)
-from titan.widgets.collapsible_container import _CollapsibleTitleBar
-
-w = _CollapsibleTitleBar(height=20, label="test")
-w.show()
-"""
-
 
 ARROW_IMG = [
     "11 11 2 1",
@@ -212,3 +202,39 @@ class CollapsibleContainer(QtWidgets.QWidget):
     @property
     def contents(self) -> QtWidgets.QWidget:
         return self._contents
+
+
+if __name__ == "__main__":
+
+    from titan.qt import QtCore, QtWidgets
+
+    # import titan.widgets.collapsible_container
+    # import imp
+    # imp.reload(titan.widgets.collapsible_container)
+    from titan.widgets.collapsible_container import CollapsibleContainer
+
+    widget = QtWidgets.QWidget()
+    widget.setWindowFlags(QtCore.Qt.Window)
+    layout = QtWidgets.QVBoxLayout(widget)
+
+    container = CollapsibleContainer(
+        title="Test", is_collapsible=True, height=16, parent=widget
+    )
+    form_layout = QtWidgets.QFormLayout(container.contents)
+    for x in range(10):
+        line_edit = QtWidgets.QLineEdit(container.contents)
+        form_layout.addRow(f"Line Edit {x}", line_edit)
+
+    container_2 = CollapsibleContainer(
+        title="Test 2", is_collapsible=True, height=16, parent=widget
+    )
+    form_layout_2 = QtWidgets.QFormLayout(container_2.contents)
+    for x in range(10):
+        line_edit = QtWidgets.QLineEdit(container_2.contents)
+        form_layout_2.addRow(f"Line Edit {x}", line_edit)
+
+    layout.addWidget(container, alignment=QtCore.Qt.AlignTop)
+    layout.addWidget(container_2, alignment=QtCore.Qt.AlignTop)
+
+    layout.addStretch()
+    widget.show()
