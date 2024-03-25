@@ -78,6 +78,7 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
         self._is_collapsible = is_collapsible
         self._collapsed = False
         self.setFixedHeight(height)
+        self._height = height
         self.clicked.connect(self._on_clicked)
 
     def is_collapsed(self) -> bool:
@@ -102,11 +103,15 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
         painter.fillRect(0, 0, event.rect().width(), self.minimumHeight(), color)
         # Draw the arrow icon
         if self._is_collapsible:
-            painter.drawPixmap(8, 4, _get_pixmap(self._collapsed, text_color.name()))
+            y_offset = (self._height - 11) / 2
+            painter.drawPixmap(
+                8, y_offset, _get_pixmap(self._collapsed, text_color.name())
+            )
         # Lastly draw the text
+        x_offset = 30 if self._is_collapsible else 10
         if self.text():
             painter.drawText(
-                30,
+                x_offset,
                 0,
                 event.rect().width(),
                 self.minimumHeight(),
@@ -121,33 +126,54 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
         self.update()
 
 
-class CollapsibleContainer(QtWidgets.QWidget):
-    """Collapsible Container like widget that provides a vertical layout.
+class ContentsWidget(QtWidgets.QWidget):
+    """Contents widget for the CollapsibleContainer."""
 
-    Note: If you want the widget to be collapsed by default, call "collapse"
-          _after_ adding the contents to the CollapsibleGroupBox so we have an
-          accurate size hint.
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+
+    def paintEvent(self, event: QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0, 255)))
+        color = self.palette().color(QtGui.QPalette.Midlight)
+        painter.setBrush(QtGui.QBrush(color.lighter(115)))
+        painter.drawRect(0, 0, event.rect().width(), event.rect().height())
+
+
+class CollapsibleContainer(QtWidgets.QWidget):
+    """Collapsible Container widget. This widget is a container that can be collapsed
+    and expanded by the user. It consists of a title bar and a contents widget.
 
     Args:
-        title (str): Title text
-        height (int): The height title bar (and size when collapsed)
-        parent (QWidget): The parent widget (if any)
+        title (Optional[str]): Text in the title bar
+        height (Optional[int]): The height title bar (and size when collapsed). Default is 16
+        parent (Optional[QWidget]): The parent widget
     """
 
     collapsed_state_changed = QtCore.Signal(bool)
 
-    def __init__(self, title: Optional[str] = None, height=20, parent=None):
+    def __init__(
+        self,
+        title: Optional[str] = None,
+        height: Optional[int] = 16,
+        is_collapsible: Optional[bool] = True,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
         super().__init__(parent=parent)
         self._height = height
-        self._titlebar = _CollapsibleTitleBar(title, height)
-        self._contents = QtWidgets.QWidget()
+        self._titlebar = _CollapsibleTitleBar(
+            title, height, is_collapsible=is_collapsible, parent=self
+        )
+        self._contents = ContentsWidget(self)
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(self._titlebar)
         main_layout.addWidget(self._contents)
-        self._expanded_size_hint = None
-        self._titlebar.clicked.connect(self._on_clicked)
+        self._size_hint = None
+        if is_collapsible:
+            self._titlebar.clicked.connect(self._on_clicked)
 
     def is_collapsed(self):
         """Returns True if the widget has been expanded, False otherwise"""
@@ -184,5 +210,5 @@ class CollapsibleContainer(QtWidgets.QWidget):
         self.collapse(not self.is_collapsed())
 
     @property
-    def contents_widget(self) -> QtWidgets.QWidget:
+    def contents(self) -> QtWidgets.QWidget:
         return self._contents
