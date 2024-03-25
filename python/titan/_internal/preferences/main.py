@@ -1,20 +1,13 @@
 from __future__ import annotations
-from typing import Any
+from typing import Optional
 from titan.qt import QtCore
 
-from .components import Component, from_preference_node
+from .components import Group, Component, from_preference_node
 from .parser import PreferenceNode, load_preferences_from_file
 
 
-class Container:
-
-    def __init__(self, name):
-        self._name = name
-
-    def __getattr__(self, name):
-        obj = Container(name)
-        self.__dict__[name] = obj
-        return obj
+class AmbiguousPreferenceError(Exception):
+    """Raised when asked for a component by name and multiple components are found."""
 
 
 class Preferences(QtCore.QSettings):
@@ -51,22 +44,53 @@ class Preferences(QtCore.QSettings):
         return inst
 
     def _add_component(self, component: Component) -> None:
-        """Add a component to the preferences."""
-        if component.name in self._components:
-            raise ValueError(f"Component with name {component.name} already exists.")
+        """Add a component to the preferences.
+
+        If the component path is a single name, it will be added to the root of the preferences.
+        Otherwise, the path will be turned into a group structure so that the component can be
+        accessed by attributes. For example, a component with a path of /group1/group2/component
+        can be accessed as self.group1.group2.component.
+        """
         path = component.path.split("/")
+
         # Add the component to the root of the preferences
         if len(path) == 1:
             setattr(self, component.name, component)
-        # Create a path of containers to the component
+
+        # Create attribute accessible path to the component
         else:
+            # Create the first group if it does not exist
             if not hasattr(self, path[0]):
-                setattr(self, path[0], Container(path[0]))
-            container = getattr(self, path[0])
+                setattr(self, path[0], Group(path[0]))
+            grp = getattr(self, path[0])
             for name in path[1:-1]:
-                container = getattr(container, name)
-            setattr(container, component.name, component)
-        self._components[component.name] = component
+                grp = getattr(grp, name)
+            grp.add_component(component)
+
+        # Store the components by path, to allow for non-unique names
+        self._components[component.path] = component
+
+    def find(self, name: str) -> Optional[Component]:
+        """Returns a component by name.
+
+        Useful if you know the name of the preference you want access too,
+        without having to know the path to it.
+
+        Raises:
+            AmbiguousPreferenceError: If multiple components are found with the same name.
+        """
+        components = [c for c in self._components.values() if c.name == name]
+        if len(components) > 1:
+            paths = [c.path for c in components]
+            raise AmbiguousPreferenceError(
+                f"Multiple components found with name {name}.\n{paths}"
+            )
+        return components[0] if components else None
+
+    def list_preferences(self) -> None:
+        """List the preference paths."""
+        for path in sorted(self._components.keys()):
+            print(path)
 
 
 def get_components(preference_node: PreferenceNode) -> list[Component]:

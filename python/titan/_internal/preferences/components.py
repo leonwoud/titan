@@ -6,6 +6,44 @@ from titan.qt import QtCore
 from .parser import PreferenceNode
 
 
+class Group:
+    """Represents a group of components.
+
+    Implicitly builds a group path based on the attribute access pattern.
+
+    Example:
+        Create a group with two components:
+            general = Group("general")
+            general.appearance.add_component(ColorPicker("BackgroundColor", "#FFFFFF"))
+            general.appearance.add_component(ColorPicker("TextColor", "#000000"))
+
+        Components can be accessed like this:
+            general.appearance.BackgroundColor
+            general.appearance.TextColor
+    """
+
+    def __init__(self, name: str):
+        self._name = name
+        self._components = {}
+
+    def __getattr__(self, name: str) -> Group:
+        obj = Group(name)
+        self.__dict__[name] = obj
+        return obj
+
+    def add_component(self, component: Component) -> None:
+        """Add a component to the group, ensure the component name is unique.
+        Args:
+            component: The component to add.
+
+        Raises:
+            ValueError: If a component with the same name already exists."""
+        if component.name in self._components:
+            raise ValueError(f"Component with name {component.name} already exists.")
+        self._components[component.name] = component
+        self.__dict__[component.name] = component
+
+
 class Component:
 
     DataTypes = {
@@ -157,7 +195,8 @@ class ColorPicker(Component):
         return cls(node.name, node.get_path(), node.default)
 
 
-class ComboBox(Component):
+class TypedItemComponent(Component):
+    """A shared base class for components that contain items."""
 
     def __init__(
         self,
@@ -180,26 +219,42 @@ class ComboBox(Component):
 
     @classmethod
     def validate(cls, node: PreferenceNode):
-        super(ComboBox, cls).validate(node)
+        super(TypedItemComponent, cls).validate(node)
         if not node.children:
-            raise ValueError(f"ComboBox '{node.name}' node must have at least one item")
+            raise ValueError(
+                f"{cls.__name__} '{node.name}' node must have at least one item"
+            )
         if not hasattr(node, "type"):
-            raise ValueError(f"ComboBox '{node.name}' node must have a type attribute.")
+            raise ValueError(
+                f"{cls.__name__} '{node.name}' node must have a type attribute."
+            )
 
         # Validate we can convert the default value to the specified data type
         data_type = cls.DataTypes.get(node.type)
         try:
             data_type(node.default)
         except ValueError:
-            raise ValueError(f"Invalid default value for ComboBox '{node.name}'")
+            raise ValueError(f"Invalid default value for {cls.__name__} '{node.name}'")
 
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
-        super(ComboBox, cls).from_preference_node(node)
+        super(TypedItemComponent, cls).from_preference_node(node)
         items = [child.name for child in node.children]
         return cls(
             node.name, node.get_path(), node.type, items, node.default, label=node.label
         )
+
+
+class ComboBox(TypedItemComponent):
+    """A combo box component."""
+
+    pass
+
+
+class RadioButton(TypedItemComponent):
+    """A radio button component."""
+
+    pass
 
 
 def as_bool(value: str) -> bool:
@@ -221,5 +276,7 @@ def from_preference_node(node: PreferenceNode) -> Component:
         return ColorPicker.from_preference_node(node)
     elif node.node_type == "ComboBox":
         return ComboBox.from_preference_node(node)
+    elif node.node_type == "RadioButton":
+        return RadioButton.from_preference_node(node)
 
     raise NotImplementedError(f"Component type {node.node_type} is not supported.")
