@@ -178,19 +178,15 @@ class CollapsibleContainer(QtWidgets.QWidget):
         currently_collapsed = self.is_collapsed()
         if state == currently_collapsed:
             return
-
         if not currently_collapsed:
             self._size_hint = self.sizeHint()
-
         self._contents.setHidden(state)
-
         if state:
             self.setMinimumHeight(self._height)
             self.setMaximumHeight(self._height)
         else:
             self.setMinimumHeight(self._size_hint.height())
             self.setMaximumHeight(self._size_hint.height())
-
         self._titlebar.set_collapsed_state(state)
         self.collapsed_state_changed.emit(state)
 
