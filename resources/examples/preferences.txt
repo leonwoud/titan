@@ -20,12 +20,14 @@
         - label "Int Field"
         - type int
         - default 10
+        - range 0 10
     
     [Field]
         - name floatField
         - label "Float Field"
         - type float
         - default 3.14
+        - range -10.0 10.0
 
     [GroupBox]
         - name home
@@ -47,7 +49,7 @@
         [ColorPicker]
             - name colorPicker1
             - label colour
-            - default "#FFF000"
+            - default "255,0,128"
 
     [CheckBox]
         - name bottom

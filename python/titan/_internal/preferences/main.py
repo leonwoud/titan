@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Union
 from titan.qt import QtCore
 
 from .components import Group, Component, from_preference_node
@@ -12,6 +12,8 @@ class AmbiguousPreferenceError(Exception):
 
 class Preferences(QtCore.QSettings):
     """Preferences class that extends QSettings to provide additional functionality."""
+
+    preference_updated = QtCore.Signal(str, object)
 
     def __init__(
         self,
@@ -40,6 +42,7 @@ class Preferences(QtCore.QSettings):
             settings.organization,
         )
         for component in components[1:]:
+            component.set_preferences(inst)
             inst._add_component(component)
         return inst
 
@@ -91,6 +94,15 @@ class Preferences(QtCore.QSettings):
         """List the preference paths."""
         for path in sorted(self._components.keys()):
             print(path)
+
+    def set_value(self, path: str, value: Union[str, int, float]) -> None:
+        """Set a value in the preferences."""
+        self.setValue(path, value)
+        self.preference_updated.emit(path, value)
+
+    def get_value(self, path: str) -> Optional[Union[str, int, float]]:
+        """Get a value from the preferences."""
+        return self.value(path)
 
 
 def get_components(preference_node: PreferenceNode) -> list[Component]:

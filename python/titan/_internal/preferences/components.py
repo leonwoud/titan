@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, TypeVar
 
 from titan.qt import QtCore
 from .parser import PreferenceNode
+
+if TYPE_CHECKING:
+    from .main import Preferences
+
+Number = TypeVar("Number", int, float)
+DataTypes = TypeVar("DataTypes", str, float, int)
 
 
 class Group:
@@ -59,6 +65,7 @@ class Component:
         self.name = name
         self.path = path
         self.label = label
+        self.preferences: Preferences = None
 
     @classmethod
     def validate(self, node: PreferenceNode) -> bool:
@@ -81,6 +88,19 @@ class Component:
     def from_preference_node(cls, node: PreferenceNode) -> Component:
         """Create a component from a preference node."""
         cls.validate(node)
+
+    def set_preferences(self, preferences: Preferences) -> None:
+        """Set the preferences object for this component."""
+        self.preferences = preferences
+
+    def get_value(self) -> DataTypes:
+        """Get the value from the preferences."""
+        value = self.preferences.get_value(self.path)
+        if value is None:
+            value = self.default
+        if hasattr(self, "data_type"):
+            return self.data_type(value)
+        return value
 
 
 class Settings(Component):
@@ -142,11 +162,13 @@ class Field(Component):
         path: str,
         data_type: str,
         default: str,
+        range_: Optional[tuple] = None,
         label: Optional[str] = None,
     ):
         super().__init__(name, path, label=label)
         self.data_type = self.DataTypes.get(data_type)
         self.default = self.data_type(default)
+        self.range = tuple(self.data_type(i) for i in range_) if range_ else None
 
     @classmethod
     def validate(cls, node: PreferenceNode):
@@ -164,7 +186,11 @@ class Field(Component):
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
         super(Field, cls).from_preference_node(node)
-        return cls(node.name, node.get_path(), node.type, node.default)
+        if hasattr(node, "range"):
+            range_ = tuple([i for i in node.range.split(" ")])
+        else:
+            range_ = None
+        return cls(node.name, node.get_path(), node.type, node.default, range_=range_)
 
 
 class CheckBox(Component):
