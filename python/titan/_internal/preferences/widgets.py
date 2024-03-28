@@ -70,18 +70,16 @@ class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
 
     @QtCore.Slot(bool)
     def _on_state_changed(self, value: bool) -> None:
-        # We dont net to call out set value, as the checkbox will inherently
-        # be in sync with the value, but we call super to set the value in the
-        # preferences.
+        # Only update the preferences if the value has changed
         super().set_value(value)
 
-    def get_value(self):
+    def get_value(self) -> bool:
         return self.isChecked()
 
-    def set_value(self, value):
+    def set_value(self, value: bool) -> None:
         self.setChecked(value)
 
-    def restore_default(self):
+    def restore_default(self) -> None:
         self.set_value(self._default)
 
 
@@ -117,6 +115,8 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
         self._range = range_
         self._data_type = data_type
         self._validator = None
+        # Using QRegularExpressionValidator for int and float types
+        # instead of QIntValidator and QDoubleValidator.
         if self._data_type in (int, float):
             if self._data_type == float:
                 regex = QtCore.QRegularExpression(

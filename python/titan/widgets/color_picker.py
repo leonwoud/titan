@@ -1,3 +1,5 @@
+from typing import Optional
+
 from titan.qt import QtCore, QtGui, QtWidgets
 
 
@@ -5,24 +7,28 @@ class ColorPicker(QtWidgets.QPushButton):
 
     color_changed = QtCore.Signal(QtGui.QColor)
 
-    def __init__(self, alpha=False, parent=None):
+    def __init__(
+        self,
+        accepts_alpha: Optional[bool] = False,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
         super(ColorPicker, self).__init__(parent=parent)
-        self._include_alpha = alpha
+        self._accepts_alpha = accepts_alpha
         self.setAutoFillBackground(True)
         self.setFixedSize(20, 20)
         self._setup_widget()
 
     def _setup_widget(self):
         self.clicked.connect(self._on_click)
-        if self._include_alpha:
+        if self._accepts_alpha:
             self.set_rgba(128, 128, 128, 255)
         else:
             self.set_rgb(128, 128, 128)
 
     @QtCore.Slot()
     def _on_click(self):
-        kwargs = {}
-        if self._include_alpha:
+        kwargs = {"parent": self}
+        if self._accepts_alpha:
             kwargs["options"] = QtWidgets.QColorDialog.ShowAlphaChannel
         color = QtWidgets.QColorDialog.getColor(self._color, **kwargs)
         if color.isValid():
@@ -30,7 +36,7 @@ class ColorPicker(QtWidgets.QPushButton):
 
     def _set_color(self, color: QtGui.QColor) -> None:
         """Store the color and emit the color_changed signal."""
-        if self._include_alpha:
+        if self._accepts_alpha:
             self.set_rgba(color.red(), color.green(), color.blue(), color.alpha())
         else:
             self.set_rgb(color.red(), color.green(), color.blue())
@@ -75,3 +81,15 @@ class ColorPicker(QtWidgets.QPushButton):
         painter.setBrush(brush)
         painter.drawPolygon(triangle)
         painter.end()
+
+
+if __name__ == "__main__":
+    import sys
+
+    app = QtWidgets.QApplication(sys.argv)
+    window = QtWidgets.QWidget()
+    layout = QtWidgets.QVBoxLayout(window)
+    color_picker = ColorPicker()
+    layout.addWidget(color_picker)
+    window.show()
+    sys.exit(app.exec_())
