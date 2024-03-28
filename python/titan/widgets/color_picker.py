@@ -17,6 +17,7 @@ class ColorPicker(QtWidgets.QPushButton):
         self.setAutoFillBackground(True)
         self.setFixedSize(20, 20)
         self._setup_widget()
+        self._color = None
 
     def _setup_widget(self):
         self.clicked.connect(self._on_click)
@@ -32,14 +33,15 @@ class ColorPicker(QtWidgets.QPushButton):
             kwargs["options"] = QtWidgets.QColorDialog.ShowAlphaChannel
         color = QtWidgets.QColorDialog.getColor(self._color, **kwargs)
         if color.isValid():
-            self._set_color(color)
+            self.set_color(color)
 
-    def _set_color(self, color: QtGui.QColor) -> None:
+    def set_color(self, color: QtGui.QColor) -> None:
         """Store the color and emit the color_changed signal."""
         if self._accepts_alpha:
             self.set_rgba(color.red(), color.green(), color.blue(), color.alpha())
         else:
             self.set_rgb(color.red(), color.green(), color.blue())
+        self._color = color
 
     def set_hex(self, hex_code: str) -> None:
         """Set the color using a hex code."""
@@ -59,12 +61,10 @@ class ColorPicker(QtWidgets.QPushButton):
         self._color = QtGui.QColor(red, green, blue, alpha)
         self.color_changed.emit(self._color)
 
-    def set_csv(self, data: str):
-        """Set the color using a CSV string.
-
-        This is expected to be rgb or rgba values."""
+    def set_csv(self, data: str) -> None:
+        """Set the color using a CSV string."""
         color = QtGui.QColor(*[int(c.strip()) for c in data.split(",")])
-        self._set_colour(color)
+        self.set_colour(color)
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         """Overriden function."""

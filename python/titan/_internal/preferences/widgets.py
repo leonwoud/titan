@@ -1,8 +1,18 @@
+from contextlib import contextmanager
 from typing import Optional
 
 from titan.qt import QtCore, QtGui, QtWidgets
+from titan.widgets.color_picker import ColorPicker as TitanColorPicker
 
 from .components import Component, DataTypes, Number
+
+
+@contextmanager
+def block_signals(widget: QtWidgets.QWidget):
+    """Block signals for a widget."""
+    widget.blockSignals(True)
+    yield
+    widget.blockSignals(False)
 
 
 class PreferenceBase(QtCore.QObject):
@@ -32,8 +42,9 @@ class PreferenceBase(QtCore.QObject):
 
     def set_value(self, value):
         """Records the value in the preferences."""
-        print(f"Setting value for {self._component.path} to {value}")
-        self._component.preferences.set_value(self._component.path, value)
+        if self._component:
+            print(f"Setting value for {self._component.path} to {value}")
+            self._component.preferences.set_value(self._component.path, value)
 
     def restore_default(self):
         """Reset the widget to its default value."""
@@ -84,6 +95,9 @@ class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
 
 
 class Field(QtWidgets.QLineEdit, PreferenceBase):
+
+    value_changed = QtCore.Signal(object)
+
     """A Field preference widget.
 
     This widget is used for entering text values. It can be used for entering strings,
@@ -115,6 +129,7 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
         self._range = range_
         self._data_type = data_type
         self._validator = None
+        self._component = None
         # Using QRegularExpressionValidator for int and float types
         # instead of QIntValidator and QDoubleValidator.
         if self._data_type in (int, float):
@@ -126,8 +141,6 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
                 regex = QtCore.QRegularExpression("^-?\\d+$")
             self._validator = QtGui.QRegularExpressionValidator(regex, self)
             self.setValidator(self._validator)
-        if value is None:
-            value = default
         self.setText(str(value))
         self.editingFinished.connect(self._on_editing_finished)
 
@@ -149,6 +162,7 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
         """Set the value in the widget."""
         self.setText(str(value))
         super().set_value(value)
+        self.value_changed.emit(value)
 
     def restore_default(self):
         self.set_value(self._default)
@@ -190,4 +204,171 @@ class ComboBox(QtWidgets.QComboBox, PreferenceBase):
         self.setCurrentText(str(value))
 
     def restore_default(self):
+        self.set_value(self._default)
+
+
+class ColorPicker(QtWidgets.QWidget, PreferenceBase):
+    """A color picker preference widget."""
+
+    @classmethod
+    def from_component(cls, component: Component):
+        value = component.get_value()
+        inst = cls(value)
+        inst.set_component(component)
+        return inst
+
+    def __init__(self, value: QtGui.QColor, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent=parent)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._picker = TitanColorPicker(parent=self)
+        self._picker.set_color(value)
+        self._picker.color_changed.connect(self._on_color_changed)
+
+    @QtCore.Slot(QtGui.QColor)
+    def _on_color_changed(self, color: QtGui.QColor) -> None:
+        r, g, b, a = color.getRgb()
+        super().set_value(f"{r},{g},{b},{a}")
+
+    def get_value(self):
+        return self._color
+
+    def set_value(self, value: str):
+        self._picker.set_csv(value)
+
+    def restore_default(self):
+        self.set_value(self._default)
+
+
+class RadioButton(QtWidgets.QWidget, PreferenceBase):
+    """A radio button preference widget."""
+
+    @classmethod
+    def from_component(cls, component: Component):
+        value = component.get_value()
+        inst = cls(value, component.default, component.items())
+        inst.set_component(component)
+        return inst
+
+    def __init__(
+        self,
+        value: bool,
+        default: bool,
+        items: list[DataTypes],
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
+        super().__init__(parent=parent)
+        self._default = default
+
+        layout = QtWidgets.QHBoxLayout(self)
+        self._items = items
+        self._btn_grp = QtWidgets.QButtonGroup(self)
+
+        for i, item in enumerate(items):
+            btn = QtWidgets.QRadioButton(str(item), self)
+            btn.setChecked(item == value)
+            btn.clicked.connect(self._on_clicked)
+            layout.addWidget(btn)
+            self._btn_grp.addButton(btn, i)
+
+        layout.addStretch()
+
+    @QtCore.Slot()
+    def _on_clicked(self) -> None:
+        value = self._items[self._btn_grp.checkedId()]
+        super().set_value(value)
+
+    def get_value(self) -> bool:
+        return self._items[self._btn_grp.checkedId()]
+
+    def set_value(self, value: DataTypes) -> None:
+        self._btn_grp.button(self._items.index(value)).setChecked(True)
+
+    def restore_default(self) -> None:
+        self.set_value(self._default)
+
+
+class Slider(QtWidgets.QWidget, PreferenceBase):
+    """A slider preference widget."""
+
+    FieldLeft = "left"
+    FieldRight = "right"
+    FieldNone = "none"
+
+    @classmethod
+    def from_component(cls, component: Component):
+        value = component.get_value()
+        inst = cls(
+            component.data_type,
+            value,
+            component.default,
+            component.range,
+            component.step,
+            component.field,
+        )
+        inst.set_component(component)
+        return inst
+
+    def __init__(
+        self,
+        data_type: type,
+        value: DataTypes,
+        default: DataTypes,
+        range_: tuple[Number, Number],
+        step: Number,
+        field: str,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
+        super().__init__(parent=parent)
+        self._data_type = data_type
+        self._default = default
+        self._range = range_
+        self._step = step
+
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self._slider = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+        self._slider.setRange(range_[0], range_[1])
+        self._slider.setSingleStep(step)
+        self._slider.setValue(value)
+        self._slider.valueChanged.connect(self._on_slider_changed)
+
+        self._field = Field(data_type, value, default, range_, self)
+        self._field.value_changed.connect(self._on_field_changed)
+
+        layout.addWidget(self._slider)
+
+        if field == self.FieldLeft:
+            layout.insertWidget(0, self._field)
+        elif field == self.FieldRight:
+            layout.insertWidget(1, self._field)
+        else:
+            self._field.hide()
+
+        layout.setStretchFactor(self._slider, 1)
+
+    @QtCore.Slot(int)
+    def _on_slider_changed(self, value: int) -> None:
+        with block_signals(self._field):
+            self._field.set_value(value)
+        super().set_value(value)
+
+    @QtCore.Slot(object)
+    def _on_field_changed(self, value: object) -> None:
+        if value < self._range[0]:
+            value = self._range[0]
+        elif value > self._range[1]:
+            value = self._range[1]
+        with block_signals(self._slider):
+            self._slider.setValue(value)
+
+    @QtCore.Slot()
+    def get_value(self) -> DataTypes:
+        return self._field.get_value()
+
+    def set_value(self, value: DataTypes) -> None:
+        self.setValue(value)
+
+    def restore_default(self) -> None:
         self.set_value(self._default)

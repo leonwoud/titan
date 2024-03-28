@@ -49,7 +49,7 @@
         [ColorPicker]
             - name colorPicker1
             - label colour
-            - default "255,0,128"
+            - default "255,127,80"
 
     [CheckBox]
         - name bottom
@@ -72,12 +72,21 @@
     [RadioButton]
         - name radio
         - label "Radio Buttons"
-        - default value2
-        - type str
+        - default 4
+        - type int
 
         [Item]
-            - name value1
+            - name 2
         [Item]
-            - name value2
+            - name 4
         [Item]
-            - name value3
+            - name 6
+
+    [Slider]
+        - name slider
+        - label "Slider"
+        - default 4.5
+        - type float
+        - step 0.1
+        - range 0.0 10.0
+        - field left

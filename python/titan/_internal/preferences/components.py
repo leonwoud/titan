@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, TypeVar
 
-from titan.qt import QtCore
+from titan.qt import QtCore, QtGui
 from .parser import PreferenceNode
 
 if TYPE_CHECKING:
@@ -193,23 +193,19 @@ class Field(Component):
         return cls(node.name, node.get_path(), node.type, node.default, range_=range_)
 
 
-class CheckBox(Component):
+class State(Component):
 
     def __init__(self, name: str, path: str, default: str, label: Optional[str] = None):
         super().__init__(name, path, label=label)
         self.default = as_bool(default)
 
     @classmethod
-    def validate(cls, node: PreferenceNode):
-        super(CheckBox, cls).validate(node)
-
-    @classmethod
     def from_preference_node(cls, node: PreferenceNode):
-        super(CheckBox, cls).validate(node)
+        super(State, cls).from_preference_node(node)
         return cls(node.name, node.get_path(), node.default)
 
 
-class ColorPicker(Component):
+class Color(Component):
 
     def __init__(self, name: str, path: str, default: str, label: Optional[str] = None):
         super().__init__(name, path, label=label)
@@ -217,8 +213,15 @@ class ColorPicker(Component):
 
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
-        super(ColorPicker, cls).from_preference_node(node)
+        super(Color, cls).from_preference_node(node)
         return cls(node.name, node.get_path(), node.default)
+
+    def get_value(self) -> DataTypes:
+        """Get the color from the preferences."""
+        value = self.preferences.get_value(self.path)
+        if value is None:
+            value = self.default
+        return QtGui.QColor(*[int(comp.strip()) for comp in value.split(",")])
 
 
 class TypedItemComponent(Component):
@@ -271,16 +274,60 @@ class TypedItemComponent(Component):
         )
 
 
-class ComboBox(TypedItemComponent):
+class Combo(TypedItemComponent):
     """A combo box component."""
 
     pass
 
 
-class RadioButton(TypedItemComponent):
+class Radio(TypedItemComponent):
     """A radio button component."""
 
     pass
+
+
+class Slider(Component):
+    """A slider component."""
+
+    def __init__(
+        self,
+        name: str,
+        path: str,
+        data_type: str,
+        default: str,
+        step: str,
+        range_: tuple[str],
+        field: str,  # none, left, right
+        label: Optional[str] = None,
+    ):
+        super().__init__(name, path, label=label)
+        self.data_type = self.DataTypes.get(data_type)
+        self.default = self.data_type(default)
+        self.step = self.data_type(step)
+        self.range = tuple(self.data_type(i) for i in range_)
+        self.field = field
+
+    @classmethod
+    def validate(cls, node: PreferenceNode):
+        super(Slider, cls).validate(node)
+        if not hasattr(node, "range"):
+            raise ValueError(f"Slider '{node.name}' must have a range attribute.")
+        if not hasattr(node, "field"):
+            node.add_property("field", "none")
+
+    @classmethod
+    def from_preference_node(cls, node: PreferenceNode):
+        super(Slider, cls).from_preference_node(node)
+        return cls(
+            node.name,
+            node.get_path(),
+            node.type,
+            node.default,
+            node.step,
+            tuple([i for i in node.range.split(" ")]),
+            node.field,
+            label=node.label,
+        )
 
 
 def as_bool(value: str) -> bool:
@@ -297,12 +344,14 @@ def from_preference_node(node: PreferenceNode) -> Component:
     elif node.node_type == "Field":
         return Field.from_preference_node(node)
     elif node.node_type == "CheckBox":
-        return CheckBox.from_preference_node(node)
+        return State.from_preference_node(node)
     elif node.node_type == "ColorPicker":
-        return ColorPicker.from_preference_node(node)
+        return Color.from_preference_node(node)
     elif node.node_type == "ComboBox":
-        return ComboBox.from_preference_node(node)
+        return Combo.from_preference_node(node)
     elif node.node_type == "RadioButton":
-        return RadioButton.from_preference_node(node)
+        return Radio.from_preference_node(node)
+    elif node.node_type == "Slider":
+        return Slider.from_preference_node(node)
 
     raise NotImplementedError(f"Component type {node.node_type} is not supported.")
