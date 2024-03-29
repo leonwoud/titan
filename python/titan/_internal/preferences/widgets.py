@@ -2,7 +2,8 @@ from contextlib import contextmanager
 from typing import Optional
 
 from titan.qt import QtCore, QtGui, QtWidgets
-from titan.widgets.color_picker import ColorPicker as TitanColorPicker
+from titan.widgets import ColorPicker as _ColorPicker
+from titan.widgets import FloatSlider, IntSlider
 
 from .components import Component, DataTypes, Number
 
@@ -52,8 +53,7 @@ class PreferenceBase(QtCore.QObject):
 
     def reload(self):
         """Reload the value from the preferences."""
-        value = self._component.get_value()
-        self.set_value(value)
+        self.set_value(self._component.value)
 
 
 class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
@@ -109,7 +109,7 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
     def from_component(cls, component: Component):
         inst = cls(
             component.data_type,
-            component.get_value(),
+            component.value,
             component.default,
             range_=component.range,
         )
@@ -173,8 +173,9 @@ class ComboBox(QtWidgets.QComboBox, PreferenceBase):
 
     @classmethod
     def from_component(cls, component: Component):
-        value = component.get_value()
-        inst = cls(component.data_type, value, component.default, component.items())
+        inst = cls(
+            component.data_type, component.value, component.default, component.items()
+        )
         inst.set_component(component)
         return inst
 
@@ -212,8 +213,7 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
 
     @classmethod
     def from_component(cls, component: Component):
-        value = component.get_value()
-        inst = cls(value)
+        inst = cls(component.value)
         inst.set_component(component)
         return inst
 
@@ -221,7 +221,7 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
         super().__init__(parent=parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self._picker = TitanColorPicker(parent=self)
+        self._picker = _ColorPicker(parent=self)
         self._picker.set_color(value)
         self._picker.color_changed.connect(self._on_color_changed)
 
@@ -240,13 +240,12 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
         self.set_value(self._default)
 
 
-class RadioButton(QtWidgets.QWidget, PreferenceBase):
+class RadioButtons(QtWidgets.QWidget, PreferenceBase):
     """A radio button preference widget."""
 
     @classmethod
     def from_component(cls, component: Component):
-        value = component.get_value()
-        inst = cls(value, component.default, component.items())
+        inst = cls(component.value, component.default, component.items())
         inst.set_component(component)
         return inst
 
@@ -291,16 +290,15 @@ class RadioButton(QtWidgets.QWidget, PreferenceBase):
 class Slider(QtWidgets.QWidget, PreferenceBase):
     """A slider preference widget."""
 
-    FieldLeft = "left"
-    FieldRight = "right"
-    FieldNone = "none"
+    FieldPositionLeft = "left"
+    FieldPositionRight = "right"
+    FieldPositionNone = "none"
 
     @classmethod
     def from_component(cls, component: Component):
-        value = component.get_value()
         inst = cls(
             component.data_type,
-            value,
+            component.value,
             component.default,
             component.range,
             component.step,
@@ -324,28 +322,25 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
         self._default = default
         self._range = range_
         self._step = step
-
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-
-        self._slider = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-        self._slider.setRange(range_[0], range_[1])
-        self._slider.setSingleStep(step)
-        self._slider.setValue(value)
-        self._slider.valueChanged.connect(self._on_slider_changed)
-
+        if data_type == int:
+            self._slider = IntSlider(range_[0], range_[1], step, parent=self)
+        elif data_type == float:
+            self._slider = FloatSlider(range_[0], range_[1], step, parent=self)
+        self._slider.set_value(value)
+        self._slider.value_changed.connect(self._on_slider_changed)
         self._field = Field(data_type, value, default, range_, self)
         self._field.value_changed.connect(self._on_field_changed)
-
         layout.addWidget(self._slider)
-
-        if field == self.FieldLeft:
+        if field == self.FieldPositionLeft:
             layout.insertWidget(0, self._field)
-        elif field == self.FieldRight:
+        elif field == self.FieldPositionRight:
             layout.insertWidget(1, self._field)
-        else:
+        elif field == self.FieldPositionNone:
             self._field.hide()
-
+        else:
+            raise ValueError(f"Invalid field position: {field}")
         layout.setStretchFactor(self._slider, 1)
 
     @QtCore.Slot(int)

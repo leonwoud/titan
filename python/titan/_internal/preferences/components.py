@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, Optional, TypeVar
 
 from titan.qt import QtCore, QtGui
@@ -52,6 +53,8 @@ class Group:
 
 class Component:
 
+    Type = Enum("ComponentType", "Settings Field State Color Combo Radio Slider")
+
     DataTypes = {
         "int": int,
         "str": str,
@@ -93,7 +96,8 @@ class Component:
         """Set the preferences object for this component."""
         self.preferences = preferences
 
-    def get_value(self) -> DataTypes:
+    @property
+    def value(self) -> DataTypes:
         """Get the value from the preferences."""
         value = self.preferences.get_value(self.path)
         if value is None:
@@ -102,8 +106,14 @@ class Component:
             return self.data_type(value)
         return value
 
+    @property
+    def type(self):
+        return self._TYPE
+
 
 class Settings(Component):
+
+    _TYPE = Component.Type.Settings
 
     def __init__(self, name, scope, application, organization):
         super().__init__(name, None, None)
@@ -156,6 +166,8 @@ class Settings(Component):
 
 class Field(Component):
 
+    _TYPE = Component.Type.Field
+
     def __init__(
         self,
         name: str,
@@ -195,6 +207,8 @@ class Field(Component):
 
 class State(Component):
 
+    _TYPE = Component.Type.State
+
     def __init__(self, name: str, path: str, default: str, label: Optional[str] = None):
         super().__init__(name, path, label=label)
         self.default = as_bool(default)
@@ -207,6 +221,8 @@ class State(Component):
 
 class Color(Component):
 
+    _TYPE = Component.Type.Color
+
     def __init__(self, name: str, path: str, default: str, label: Optional[str] = None):
         super().__init__(name, path, label=label)
         self.default = default
@@ -216,7 +232,8 @@ class Color(Component):
         super(Color, cls).from_preference_node(node)
         return cls(node.name, node.get_path(), node.default)
 
-    def get_value(self) -> DataTypes:
+    @property
+    def value(self) -> QtGui.QColor:
         """Get the color from the preferences."""
         value = self.preferences.get_value(self.path)
         if value is None:
@@ -277,17 +294,19 @@ class TypedItemComponent(Component):
 class Combo(TypedItemComponent):
     """A combo box component."""
 
-    pass
+    _TYPE = Component.Type.Combo
 
 
 class Radio(TypedItemComponent):
     """A radio button component."""
 
-    pass
+    _TYPE = Component.Type.Radio
 
 
 class Slider(Component):
     """A slider component."""
+
+    _TYPE = Component.Type.Slider
 
     def __init__(
         self,

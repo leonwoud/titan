@@ -29,6 +29,7 @@ class Preferences(QtCore.QSettings):
         self.application = application
         self.organization = organization
         self._components = {}
+        self._preference_tree = None
 
     @classmethod
     def from_file(cls, file_path: str) -> Preferences:
@@ -45,6 +46,7 @@ class Preferences(QtCore.QSettings):
         for component in components[1:]:
             component.set_preferences(inst)
             inst._add_component(component)
+        inst._preference_tree = preference_tree
         return inst
 
     def _add_component(self, component: Component) -> None:
@@ -104,6 +106,11 @@ class Preferences(QtCore.QSettings):
     def get_value(self, path: str) -> Optional[Union[str, int, float]]:
         """Get a value from the preferences."""
         return self.value(path)
+
+    @property
+    def preference_tree(self) -> PreferenceNode:
+        """Returns the preference tree used to create the components."""
+        return self._preference_tree
 
 
 def get_components(preference_node: PreferenceNode) -> list[Component]:

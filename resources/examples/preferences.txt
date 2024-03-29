@@ -89,4 +89,4 @@
         - type float
         - step 0.1
         - range 0.0 10.0
-        - field left
+        - field right
