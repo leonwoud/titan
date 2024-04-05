@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import re
 from typing import Any, Optional
 
@@ -41,6 +42,10 @@ class PreferenceNode:
             self.name = value
             return
         self._properties[name] = value
+
+    def has_property(self, name: str) -> bool:
+        """Returns True if the property exists."""
+        return name in self._properties
 
     def add_child(self, child_node: PreferenceNode) -> None:
         """Add a child as a child of this node."""
@@ -87,7 +92,9 @@ class PreferenceNode:
             # Don't include the root node in the path
             if node.index == -1:
                 break
-            path.append(node.name)
+            # If the node has a name, add it to the path
+            if node.name:
+                path.append(node.name)
             node = node.parent
         return "/".join(reversed(path))
 

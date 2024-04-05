@@ -70,6 +70,11 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
         self.setFixedHeight(height)
         self._height = height
         self.clicked.connect(self._on_clicked)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy(
+                QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+            )
+        )
 
     def is_collapsed(self) -> bool:
         """Returns True if currently in a collapsed state."""
@@ -137,7 +142,7 @@ class CollapsibleContainer(QtWidgets.QWidget):
 
     Args:
         title (Optional[str]): Text in the title bar
-        height (Optional[int]): The height title bar (and size when collapsed). Default is 16
+        height (Optional[int]): The height title bar (and size when collapsed). Default is 18
         parent (Optional[QWidget]): The parent widget
     """
 
@@ -146,7 +151,7 @@ class CollapsibleContainer(QtWidgets.QWidget):
     def __init__(
         self,
         title: Optional[str] = None,
-        height: Optional[int] = 16,
+        height: Optional[int] = 18,
         is_collapsible: Optional[bool] = True,
         parent: Optional[QtWidgets.QWidget] = None,
     ):
@@ -179,7 +184,8 @@ class CollapsibleContainer(QtWidgets.QWidget):
         if state == currently_collapsed:
             return
         if not currently_collapsed:
-            self._size_hint = self.sizeHint()
+            self._size_hint = self._contents.sizeHint()
+
         self._contents.setHidden(state)
         if state:
             self.setMinimumHeight(self._height)
@@ -187,6 +193,7 @@ class CollapsibleContainer(QtWidgets.QWidget):
         else:
             self.setMinimumHeight(self._size_hint.height())
             self.setMaximumHeight(self._size_hint.height())
+
         self._titlebar.set_collapsed_state(state)
         self.collapsed_state_changed.emit(state)
 
@@ -207,7 +214,7 @@ if __name__ == "__main__":
     # import titan.widgets.collapsible_container
     # import imp
     # imp.reload(titan.widgets.collapsible_container)
-    from titan.widgets.collapsible_container import CollapsibleContainer
+    from titan.widgets import CollapsibleContainer
 
     widget = QtWidgets.QWidget()
     widget.setWindowFlags(QtCore.Qt.Window)

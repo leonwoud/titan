@@ -202,7 +202,14 @@ class Field(Component):
             range_ = tuple([i for i in node.range.split(" ")])
         else:
             range_ = None
-        return cls(node.name, node.get_path(), node.type, node.default, range_=range_)
+        return cls(
+            node.name,
+            node.get_path(),
+            node.type,
+            node.default,
+            range_=range_,
+            label=node.label,
+        )
 
 
 class State(Component):
@@ -216,7 +223,7 @@ class State(Component):
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
         super(State, cls).from_preference_node(node)
-        return cls(node.name, node.get_path(), node.default)
+        return cls(node.name, node.get_path(), node.default, label=node.label)
 
 
 class Color(Component):
@@ -230,7 +237,7 @@ class Color(Component):
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
         super(Color, cls).from_preference_node(node)
-        return cls(node.name, node.get_path(), node.default)
+        return cls(node.name, node.get_path(), node.default, node.label)
 
     @property
     def value(self) -> QtGui.QColor:

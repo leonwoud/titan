@@ -4,10 +4,27 @@
     - application titan.test
     - organization home
 
-[GroupBox]
+[Group]
     - name general
     - label "Interface: General Interface Preferences"
-    - collapsible true
+    - collapsible false
+
+    [Tabs]
+        - name tabs
+        [Tab]
+            - label "Blah"
+            [Field]
+                - name fieldTab
+                - label "Some Field"
+                - default "Some Value"
+                - type str
+        [Tab]
+            - label "Blah 2"
+            [Field]
+                - name fieldTab2
+                - label "Some Field 2"
+                - default "Some Value 2"
+                - type str
 
     [Field]
         - name field
@@ -29,7 +46,7 @@
         - default 3.14
         - range -10.0 10.0
 
-    [GroupBox]
+    [Group]
         - name home
         - label "Home Screen"
         - disable { showHomeScreen == 0 }

@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 from contextlib import contextmanager
 from typing import Optional
 
 from titan.qt import QtCore, QtGui, QtWidgets
-from titan.widgets import ColorPicker as _ColorPicker
-from titan.widgets import FloatSlider, IntSlider
+from titan.widgets import (
+    ColorPicker as _ColorPicker,
+    FloatSlider,
+    IntSlider,
+)
 
-from .components import Component, DataTypes, Number
+from titan._internal.preferences.components import Component, DataTypes, Number
 
 
 @contextmanager
@@ -24,9 +29,12 @@ class PreferenceBase(QtCore.QObject):
     values to their defaults.
     """
 
+    value_changed = QtCore.Signal(object)
+
     def __init__(self):
         super().__init__()
         self._component = None
+        self._default = None
 
     @classmethod
     def from_component(cls, component: Component):
@@ -46,6 +54,7 @@ class PreferenceBase(QtCore.QObject):
         if self._component:
             print(f"Setting value for {self._component.path} to {value}")
             self._component.preferences.set_value(self._component.path, value)
+        self.value_changed.emit(value)
 
     def restore_default(self):
         """Reset the widget to its default value."""
@@ -55,6 +64,10 @@ class PreferenceBase(QtCore.QObject):
         """Reload the value from the preferences."""
         self.set_value(self._component.value)
 
+    @property
+    def default(self):
+        return self._default
+
 
 class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
     """A checkbox preference widget."""
@@ -62,9 +75,7 @@ class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
     @classmethod
     def from_component(cls, component: Component):
         value = component.preferences.get_value(component.path)
-        if value is None:
-            value = component.default
-        inst = cls(value, component.default)
+        inst = cls(value, component.default, component.label)
         inst.set_component(component)
         return inst
 
@@ -72,32 +83,40 @@ class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
         self,
         value: bool,
         default: bool,
+        label: Optional[str] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ):
-        super().__init__(parent=parent)
+        super().__init__(label, parent=parent)
         self._default = default
         self.setChecked(value)
+        self._update_label_font(value)
         self.stateChanged.connect(self._on_state_changed)
 
-    @QtCore.Slot(bool)
-    def _on_state_changed(self, value: bool) -> None:
-        # Only update the preferences if the value has changed
+    @QtCore.Slot(int)
+    def _on_state_changed(self, value: int) -> None:
+        value = bool(value)
         super().set_value(value)
+        self._update_label_font(value)
+
+    def _update_label_font(self, value: bool) -> None:
+        is_default = value == self._default
+        font = self.font()
+        font.setBold(not is_default)
+        font.setItalic(not is_default)
+        self.setFont(font)
 
     def get_value(self) -> bool:
         return self.isChecked()
 
     def set_value(self, value: bool) -> None:
         self.setChecked(value)
+        self._update_label_font(value)
 
     def restore_default(self) -> None:
         self.set_value(self._default)
 
 
 class Field(QtWidgets.QLineEdit, PreferenceBase):
-
-    value_changed = QtCore.Signal(object)
-
     """A Field preference widget.
 
     This widget is used for entering text values. It can be used for entering strings,
@@ -162,7 +181,6 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
         """Set the value in the widget."""
         self.setText(str(value))
         super().set_value(value)
-        self.value_changed.emit(value)
 
     def restore_default(self):
         self.set_value(self._default)
@@ -213,22 +231,32 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
 
     @classmethod
     def from_component(cls, component: Component):
-        inst = cls(component.value)
+        inst = cls(component.value, component.default)
         inst.set_component(component)
         return inst
 
-    def __init__(self, value: QtGui.QColor, parent: Optional[QtWidgets.QWidget] = None):
+    def __init__(
+        self,
+        value: QtGui.QColor,
+        default: str,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ):
         super().__init__(parent=parent)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._picker = _ColorPicker(parent=self)
         self._picker.set_color(value)
+        self._color = value
         self._picker.color_changed.connect(self._on_color_changed)
+        layout.addWidget(self._picker)
+        self._default = default
 
     @QtCore.Slot(QtGui.QColor)
     def _on_color_changed(self, color: QtGui.QColor) -> None:
         r, g, b, a = color.getRgb()
-        super().set_value(f"{r},{g},{b},{a}")
+        color_str = f"{r},{g},{b},{a}"
+        super().set_value(color_str)
+        self._color = color_str
 
     def get_value(self):
         return self._color
