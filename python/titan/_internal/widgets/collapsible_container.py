@@ -127,14 +127,6 @@ class ContentsWidget(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
 
-    def paintEvent(self, event: QtGui.QPaintEvent):
-        painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtGui.QPen(QtGui.QColor(0, 0, 0, 255)))
-        color = self.palette().color(QtGui.QPalette.Midlight)
-        painter.setBrush(QtGui.QBrush(color.lighter(115)))
-        painter.drawRect(0, 0, event.rect().width(), event.rect().height())
-
 
 class CollapsibleContainer(QtWidgets.QWidget):
     """Collapsible Container widget. This widget is a container that can be collapsed

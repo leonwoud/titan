@@ -74,8 +74,7 @@ class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
 
     @classmethod
     def from_component(cls, component: Component):
-        value = component.preferences.get_value(component.path)
-        inst = cls(value, component.default, component.label)
+        inst = cls(component.value, component.default, component.label)
         inst.set_component(component)
         return inst
 
@@ -318,6 +317,11 @@ class RadioButtons(QtWidgets.QWidget, PreferenceBase):
 class Slider(QtWidgets.QWidget, PreferenceBase):
     """A slider preference widget."""
 
+    # value_changed signal is added here (overriding the PreferenceBase)
+    # to avoid the signals and slots in QMetaObject Sort Warning and
+    # allow connections to be made to the signal without problems.
+    value_changed = QtCore.Signal(object)
+
     FieldPositionLeft = "left"
     FieldPositionRight = "right"
     FieldPositionNone = "none"
@@ -353,13 +357,11 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         if data_type == int:
-            self._slider = IntSlider(range_[0], range_[1], step, parent=self)
+            self._slider = IntSlider(range_[0], range_[1], step)
         elif data_type == float:
-            self._slider = FloatSlider(range_[0], range_[1], step, parent=self)
+            self._slider = FloatSlider(range_[0], range_[1], step)
         self._slider.set_value(value)
-        self._slider.value_changed.connect(self._on_slider_changed)
-        self._field = Field(data_type, value, default, range_, self)
-        self._field.value_changed.connect(self._on_field_changed)
+        self._field = Field(data_type, value, default, range_)
         layout.addWidget(self._slider)
         if field == self.FieldPositionLeft:
             layout.insertWidget(0, self._field)
@@ -370,9 +372,12 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
         else:
             raise ValueError(f"Invalid field position: {field}")
         layout.setStretchFactor(self._slider, 1)
+        # Connect signals
+        self._slider.value_changed.connect(self._on_slider_changed)
+        self._field.value_changed.connect(self._on_field_changed)
 
-    @QtCore.Slot(int)
-    def _on_slider_changed(self, value: int) -> None:
+    @QtCore.Slot(object)
+    def _on_slider_changed(self, value: object) -> None:
         with block_signals(self._field):
             self._field.set_value(value)
         super().set_value(value)

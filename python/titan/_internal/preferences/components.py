@@ -225,6 +225,14 @@ class State(Component):
         super(State, cls).from_preference_node(node)
         return cls(node.name, node.get_path(), node.default, label=node.label)
 
+    @property
+    def value(self) -> bool:
+        """Get the value from the preferences."""
+        value = self.preferences.get_value(self.path)
+        if value is None:
+            value = self.default
+        return as_bool(value)
+
 
 class Color(Component):
 
@@ -358,6 +366,8 @@ class Slider(Component):
 
 def as_bool(value: str) -> bool:
     """Convert a string to a boolean."""
+    if not isinstance(value, str):
+        return bool(value)
     if value.lower() in ("true", "1"):
         return True
     return False

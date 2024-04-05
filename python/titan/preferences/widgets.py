@@ -1,5 +1,3 @@
-from typing import TypeVar
-
 from titan._internal.preferences.main import from_component
 from titan._internal.preferences.widgets import (
     CheckBox,

@@ -210,8 +210,8 @@ class PreferenceFormLayout(QtWidgets.QFormLayout):
     def add_row(self, label: str, widget: PreferenceWidget) -> None:
         label = Label(label, widget.default)
         label.update_font(widget.get_value())
-        widget.value_changed.connect(label.on_value_changed)
         super().addRow(label, widget)
+        widget.value_changed.connect(label.on_value_changed)
 
     def add_widget(self, widget: QtWidgets.QWidget) -> None:
         super().addRow(widget)
