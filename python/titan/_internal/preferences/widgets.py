@@ -14,11 +14,13 @@ from titan._internal.preferences.components import Component, DataTypes, Number
 
 
 @contextmanager
-def block_signals(widget: QtWidgets.QWidget):
-    """Block signals for a widget."""
-    widget.blockSignals(True)
+def block_signals(widgets: list[QtWidgets.QWidget]):
+    """Block signals for the given list of widgets."""
+    for widget in widgets:
+        widget.blockSignals(True)
     yield
-    widget.blockSignals(False)
+    for widget in widgets:
+        widget.blockSignals(False)
 
 
 class PreferenceBase(QtCore.QObject):
@@ -378,13 +380,12 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
         else:
             raise ValueError(f"Invalid field position: {field}")
         layout.setStretchFactor(self._slider, 1)
-        # Connect signals
         self._slider.value_changed.connect(self._on_slider_changed)
         self._field.value_changed.connect(self._on_field_changed)
 
     @QtCore.Slot(object)
     def _on_slider_changed(self, value: object) -> None:
-        with block_signals(self._field):
+        with block_signals([self._field]):
             self._field.set_value(value)
         super().set_value(value)
 
@@ -394,7 +395,7 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
             value = self._range[0]
         elif value > self._range[1]:
             value = self._range[1]
-        with block_signals(self._slider):
+        with block_signals([self._slider]):
             self._slider.set_value(value)
 
     @QtCore.Slot()
@@ -403,7 +404,7 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
 
     def set_value(self, value: DataTypes) -> None:
         super().set_value(value)
-        with block_signals(self._field):
+        with block_signals([self._field, self._slider]):
             self._field.set_value(value)
             self._slider.set_value(value)
 
