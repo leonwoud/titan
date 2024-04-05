@@ -121,11 +121,12 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
         self.update()
 
 
-class ContentsWidget(QtWidgets.QWidget):
+class ContentsWidget(QtWidgets.QFrame):
     """Contents widget for the CollapsibleContainer."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
+        self.setFrameStyle(QtWidgets.QFrame.StyledPanel | QtWidgets.QFrame.Sunken)
 
 
 class CollapsibleContainer(QtWidgets.QWidget):
@@ -202,10 +203,6 @@ class CollapsibleContainer(QtWidgets.QWidget):
 if __name__ == "__main__":
 
     from titan.qt import QtCore, QtWidgets
-
-    # import titan.widgets.collapsible_container
-    # import imp
-    # imp.reload(titan.widgets.collapsible_container)
     from titan.widgets import CollapsibleContainer
 
     widget = QtWidgets.QWidget()

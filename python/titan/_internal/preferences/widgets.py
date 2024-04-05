@@ -245,15 +245,19 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
         layout.setContentsMargins(0, 0, 0, 0)
         self._picker = _ColorPicker(parent=self)
         self._picker.set_color(value)
-        self._color = value
+        self._color = self._as_str(value)
         self._picker.color_changed.connect(self._on_color_changed)
         layout.addWidget(self._picker)
         self._default = default
 
+    @staticmethod
+    def _as_str(color):
+        r, g, b, a = color.getRgb()
+        return f"{r},{g},{b},{a}"
+
     @QtCore.Slot(QtGui.QColor)
     def _on_color_changed(self, color: QtGui.QColor) -> None:
-        r, g, b, a = color.getRgb()
-        color_str = f"{r},{g},{b},{a}"
+        color_str = self._as_str(color)
         super().set_value(color_str)
         self._color = color_str
 
@@ -262,6 +266,7 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
 
     def set_value(self, value: str):
         self._picker.set_csv(value)
+        self._color = value
 
     def restore_default(self):
         self.set_value(self._default)
@@ -287,6 +292,7 @@ class RadioButtons(QtWidgets.QWidget, PreferenceBase):
         self._default = default
 
         layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         self._items = items
         self._btn_grp = QtWidgets.QButtonGroup(self)
 
@@ -389,14 +395,17 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
         elif value > self._range[1]:
             value = self._range[1]
         with block_signals(self._slider):
-            self._slider.setValue(value)
+            self._slider.set_value(value)
 
     @QtCore.Slot()
     def get_value(self) -> DataTypes:
         return self._field.get_value()
 
     def set_value(self, value: DataTypes) -> None:
-        self.setValue(value)
+        super().set_value(value)
+        with block_signals(self._field):
+            self._field.set_value(value)
+            self._slider.set_value(value)
 
     def restore_default(self) -> None:
         self.set_value(self._default)

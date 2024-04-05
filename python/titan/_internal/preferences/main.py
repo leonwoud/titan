@@ -182,22 +182,43 @@ def from_component(component: Component) -> PreferenceWidget:
     raise ValueError(f"Invalid component: {component}")
 
 
-class Label(QtWidgets.QLabel):
+class PreferenceLabel(QtWidgets.QPushButton):
     def __init__(
-        self, text: str, default: Any, parent: Optional[QtWidgets.QWidget] = None
+        self,
+        label_text: str,
+        widget: PreferenceWidget,
+        parent: Optional[QtWidgets.QWidget] = None,
     ):
-        super().__init__(text, parent=parent)
-        self.setFixedWidth(100)
-        self._default = default
-        self.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        super().__init__(parent=parent)
+        self._label = QtWidgets.QLabel(label_text)
+        self._label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._label)
+        self.setFixedSize(100, 20)
+        self.setFlat(True)
+        self._widget = widget
+        self._current_value = None
+        self.clicked.connect(self._on_clicked)
 
     @QtCore.Slot(object)
     def on_value_changed(self, value: Any) -> None:
         self.update_font(value)
 
+    @QtCore.Slot()
+    def _on_clicked(self) -> None:
+        value = self._widget.get_value()
+        if value != self._widget.default:
+            self._widget.set_value(self._widget.default)
+            self.update_font(self._widget.default)
+            self._current_value = value
+        elif self._current_value is not None:
+            self._widget.set_value(self._current_value)
+            self.update_font(self._current_value)
+
     def update_font(self, value: Any) -> None:
         font = self.font()
-        is_default = value == self._default
+        is_default = value == self._widget.default
         font.setBold(not is_default)
         font.setItalic(not is_default)
         self.setFont(font)
@@ -208,10 +229,10 @@ class PreferenceFormLayout(QtWidgets.QFormLayout):
         super().__init__(parent=parent)
 
     def add_row(self, label: str, widget: PreferenceWidget) -> None:
-        label = Label(label, widget.default)
+        label = PreferenceLabel(label, widget)
         label.update_font(widget.get_value())
-        super().addRow(label, widget)
         widget.value_changed.connect(label.on_value_changed)
+        super().addRow(label, widget)
 
     def add_widget(self, widget: QtWidgets.QWidget) -> None:
         super().addRow(widget)

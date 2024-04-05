@@ -64,7 +64,7 @@ class ColorPicker(QtWidgets.QPushButton):
     def set_csv(self, data: str) -> None:
         """Set the color using a CSV string."""
         color = QtGui.QColor(*[int(c.strip()) for c in data.split(",")])
-        self.set_colour(color)
+        self.set_color(color)
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         """Overriden function."""

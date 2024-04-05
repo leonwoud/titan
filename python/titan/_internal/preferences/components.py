@@ -245,7 +245,11 @@ class Color(Component):
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
         super(Color, cls).from_preference_node(node)
-        return cls(node.name, node.get_path(), node.default, node.label)
+        # Add the alpha component if not included
+        default = [comp.strip() for comp in node.default.split(",")]
+        if len(default) == 3:
+            default.append("255")
+        return cls(node.name, node.get_path(), ",".join(default), node.label)
 
     @property
     def value(self) -> QtGui.QColor:
