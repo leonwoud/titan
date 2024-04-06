@@ -20,13 +20,14 @@ from titan._internal.preferences.widgets import (
     ColorPicker,
     ComboBox,
     Field,
+    PreferenceBase,
     RadioButtons,
     Slider,
 )
 
 # TypeVar for the return type of from_component
-PreferenceWidget = TypeVar(
-    "PreferenceWidget", CheckBox, ColorPicker, ComboBox, Field, RadioButtons, Slider
+PreferenceComponent = TypeVar(
+    "PreferenceComponent", CheckBox, ColorPicker, ComboBox, Field, RadioButtons, Slider
 )
 
 
@@ -126,9 +127,13 @@ class Preferences(QtCore.QSettings):
             print(path)
 
     def set_value(self, path: str, value: Union[str, int, float]) -> None:
-        """Set a value in the preferences."""
+        """Set a value in the preferences.
+
+        Args:
+            path: The path to the preference.
+            value: The value to set.
+        """
         self.setValue(path, value)
-        self.preference_updated.emit(path, value)
 
     def get_value(self, path: str) -> Optional[Union[str, int, float]]:
         """Get a value from the preferences."""
@@ -156,7 +161,7 @@ def get_components(preference_node: PreferenceNode) -> list[Component]:
     return components
 
 
-def from_component(component: Component) -> PreferenceWidget:
+def from_component(component: Component) -> PreferenceComponent:
     """Return the appropriate widget for the given component.
 
     Args:
@@ -186,7 +191,7 @@ class PreferenceLabel(QtWidgets.QPushButton):
     def __init__(
         self,
         label_text: str,
-        widget: PreferenceWidget,
+        widget: PreferenceComponent,
         parent: Optional[QtWidgets.QWidget] = None,
     ):
         super().__init__(parent=parent)
@@ -228,7 +233,7 @@ class PreferenceFormLayout(QtWidgets.QFormLayout):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
-    def add_row(self, label: str, widget: PreferenceWidget) -> None:
+    def add_row(self, label: str, widget: PreferenceComponent) -> None:
         label = PreferenceLabel(label, widget)
         label.update_font(widget.get_value())
         widget.value_changed.connect(label.on_value_changed)
@@ -375,3 +380,37 @@ def create_preferences_widget(
 
     layout.addStretch()
     return widget
+
+
+class PreferencesWidget(QtWidgets.QWidget):
+    def __init__(
+        self, preferences: Preferences, parent: Optional[QtWidgets.QWidget] = None
+    ):
+        super().__init__(parent=parent)
+        self._preferences = preferences
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._preferences_widget = create_preferences_widget(preferences)
+        layout.addWidget(self._preferences_widget)
+        self._watcher = QtCore.QFileSystemWatcher(self)
+        self._watcher.fileChanged.connect(self.reload)
+
+    def restore_defaults(self) -> None:
+        """Restore all preferences to their default values."""
+        for child in self._preferences_widget.findChildren(PreferenceBase):
+            child.restore_default()
+
+    @QtCore.Slot()
+    def reload(self) -> None:
+        """Reload the preferences from the preferences file."""
+        for child in self._preferences_widget.findChildren(PreferenceBase):
+            child.reload()
+
+    def showEvent(self, event: QtWidgets.QShowEvent) -> None:
+        self._watcher.addPath(self._preferences.fileName())
+        self.reload()
+        event.accept()
+
+    def closeEvent(self, event: QtWidgets.QCloseEvent) -> None:
+        self._watcher.removePath(self._preferences.fileName())
+        event.accept()

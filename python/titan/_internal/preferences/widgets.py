@@ -51,20 +51,21 @@ class PreferenceBase(QtCore.QObject):
         """Get the value from the widget."""
         raise NotImplementedError
 
-    def set_value(self, value):
+    def set_value(self, value, read_only=False):
         """Records the value in the preferences."""
-        if self._component:
-            print(f"Setting value for {self._component.path} to {value}")
-            self._component.preferences.set_value(self._component.path, value)
+        if not read_only:
+            if self._component:
+                self._component.preferences.set_value(self._component.path, value)
         self.value_changed.emit(value)
 
     def restore_default(self):
         """Reset the widget to its default value."""
-        raise NotImplementedError
+        self.set_value(self.default)
 
     def reload(self):
         """Reload the value from the preferences."""
-        self.set_value(self._component.value)
+        if self._component and self._component.value != self.get_value():
+            self.set_value(self._component.value, read_only=True)
 
     @property
     def default(self):
@@ -109,12 +110,9 @@ class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
     def get_value(self) -> bool:
         return self.isChecked()
 
-    def set_value(self, value: bool) -> None:
+    def set_value(self, value: bool, read_only: bool = False) -> None:
         self.setChecked(value)
         self._update_label_font(value)
-
-    def restore_default(self) -> None:
-        self.set_value(self._default)
 
 
 class Field(QtWidgets.QLineEdit, PreferenceBase):
@@ -178,13 +176,10 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
     def get_value(self):
         return self._data_type(self.text())
 
-    def set_value(self, value: DataTypes):
+    def set_value(self, value: DataTypes, read_only: bool = False):
         """Set the value in the widget."""
         self.setText(str(value))
-        super().set_value(value)
-
-    def restore_default(self):
-        self.set_value(self._default)
+        super().set_value(value, read_only)
 
 
 class ComboBox(QtWidgets.QComboBox, PreferenceBase):
@@ -220,11 +215,8 @@ class ComboBox(QtWidgets.QComboBox, PreferenceBase):
     def get_value(self):
         return self._data_type(self.currentText())
 
-    def set_value(self, value: str):
+    def set_value(self, value: str, read_only: bool = False):
         self.setCurrentText(str(value))
-
-    def restore_default(self):
-        self.set_value(self._default)
 
 
 class ColorPicker(QtWidgets.QWidget, PreferenceBase):
@@ -266,12 +258,17 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
     def get_value(self):
         return self._color
 
-    def set_value(self, value: str):
+    def set_value(self, value: str, read_only: bool = False):
         self._picker.set_csv(value)
         self._color = value
 
-    def restore_default(self):
-        self.set_value(self._default)
+    def reload(self):
+        """Reload the value from the preferences."""
+        if not self._component:
+            return
+        value = self._as_str(self._component.value)
+        if value != self.get_value():
+            self.set_value(value, read_only=True)
 
 
 class RadioButtons(QtWidgets.QWidget, PreferenceBase):
@@ -315,11 +312,9 @@ class RadioButtons(QtWidgets.QWidget, PreferenceBase):
     def get_value(self) -> bool:
         return self._items[self._btn_grp.checkedId()]
 
-    def set_value(self, value: DataTypes) -> None:
+    def set_value(self, value: DataTypes, read_only: bool = False) -> None:
         self._btn_grp.button(self._items.index(value)).setChecked(True)
-
-    def restore_default(self) -> None:
-        self.set_value(self._default)
+        super().set_value(value, read_only)
 
 
 class Slider(QtWidgets.QWidget, PreferenceBase):
@@ -402,11 +397,8 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
     def get_value(self) -> DataTypes:
         return self._field.get_value()
 
-    def set_value(self, value: DataTypes) -> None:
-        super().set_value(value)
+    def set_value(self, value: DataTypes, read_only: bool = False) -> None:
+        super().set_value(value, read_only)
         with block_signals([self._field, self._slider]):
             self._field.set_value(value)
             self._slider.set_value(value)
-
-    def restore_default(self) -> None:
-        self.set_value(self._default)

@@ -106,6 +106,11 @@ class Component:
             return self.data_type(value)
         return value
 
+    @value.setter
+    def value(self, value: DataTypes) -> None:
+        """Set the value in the preferences."""
+        self.preferences.set_value(self.path, value)
+
     @property
     def type(self):
         return self._TYPE
