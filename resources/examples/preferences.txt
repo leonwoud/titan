@@ -49,7 +49,7 @@
     [Group]
         - name home
         - label "Home Screen"
-        - disable { showHomeScreen == 0 }
+        - disable showHomeScreen == 0
         - tooltip """this is a tooltip that we'll let run long and over 
             multiple lines, but we need to read back as one"""
 

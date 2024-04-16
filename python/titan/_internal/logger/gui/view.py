@@ -46,6 +46,11 @@ class TitanLoggerView(QtWidgets.QTableView):
             level_filter.addItem(level.name, level.level_name)
         level_filter.insertSeparator(1)
 
+    def set_level_filter(self, level: str) -> None:
+        """Set the level filter."""
+        level_filter = self.horizontalHeader().get_filter(Headers.Level)
+        level_filter.setCurrentText(level)
+
     def copy_selected(self) -> None:
         """Copy the selected rows to the clipboard."""
         selection_model = self.selectionModel()

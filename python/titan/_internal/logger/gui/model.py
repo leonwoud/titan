@@ -1,6 +1,8 @@
 from typing import Any, Optional
 
+from titan.preferences import Preferences
 from titan.qt import QtCore, QtGui, QtWidgets
+
 from .header import Headers, Levels
 from .record import TitanLogRecord
 
@@ -50,9 +52,12 @@ class FilterProxyModel(QtCore.QSortFilterProxyModel):
 
 class TitanLoggerModel(QtCore.QAbstractTableModel):
 
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+    def __init__(
+        self, preferences: Preferences, parent: Optional[QtWidgets.QWidget] = None
+    ) -> None:
         super().__init__(parent=parent)
         self._log_records = []
+        self._prefs = preferences
 
     def rowCount(self, parent: QtCore.QModelIndex) -> int:
         """Return the number of rows in the model."""
@@ -89,17 +94,17 @@ class TitanLoggerModel(QtCore.QAbstractTableModel):
 
         elif role == QtCore.Qt.ForegroundRole:
             if level == Levels.Critical.level_name:
-                return QtGui.QColor("red")
+                return self._prefs.colors.critical.value
             elif level == Levels.Error.level_name:
-                return QtGui.QColor("orangered")
+                return self._prefs.colors.error.value
             elif level == Levels.Warning.level_name:
-                return QtGui.QColor("orange")
+                return self._prefs.colors.warning.value
             elif level == Levels.Info.level_name:
-                return QtGui.QColor("ghostwhite")
+                return self._prefs.colors.info.value
             elif level == Levels.Debug.level_name:
-                return QtGui.QColor("lightgrey")
+                return self._prefs.colors.info.value
             elif level == Levels.Trace.level_name:
-                return QtGui.QColor("mediumorchid")
+                return self._prefs.colors.trace.value
 
     def headerData(
         self, section: int, orientation: QtCore.Qt.Orientation, role: int

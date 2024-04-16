@@ -1,0 +1,91 @@
+[Settings]
+    - name settings
+    - scope QtCore.QSettings.UserScope
+    - application titan.logger
+    - organization titan
+
+[Group]
+    - name win
+    - label Window
+    - visible false
+    [Compound]
+        # No name, so we can access via win.width etc.
+        - label Size
+        [Field]
+            - type int
+            - name width
+            - default 800
+        [Field]
+            - type int
+            - name height
+            - default 600
+    [Compound]
+        # defaults are null, so we can center the widget on the first load
+        - name pos
+        - label Position
+        [Field]
+            - type int
+            - name x
+            - default null
+        [Field]
+            - type int
+            - name y
+            - default null
+
+[Group]
+    - label General
+
+    [ComboBox]
+        - name level
+        - label "Log Level"
+        - default "Any"
+        - type str
+
+        [Item]
+            - name Any
+        [Item]
+            - name Trace
+        [Item]
+            - name Debug
+        [Item]
+            - name Info
+        [Item]
+            - name Warning
+        [Item]
+            - name Error
+        [Item]
+            - name Critical
+
+[Group]
+    - label Logger Colors
+    - name colors
+
+    [ColorPicker]
+        - label Trace
+        - name trace
+        - default 186,85,211
+
+    [ColorPicker]
+        - label Debug
+        - name debug
+        - default 211,211,211
+
+    [ColorPicker]
+        - label Info
+        - name info
+        - default 248,248,255
+    
+    [ColorPicker]
+        - label Warning
+        - name warning
+        - default 255,165,0
+
+    [ColorPicker]
+        - label Error
+        - name error
+        - default 255,69,0
+    
+    [ColorPicker]
+        - label Critical
+        - name critical
+        - default 255,0,0

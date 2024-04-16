@@ -6,8 +6,8 @@ from titan.qt import QtCore, QtWidgets
 from titan.widgets import CollapsibleContainer
 
 from titan._internal.preferences.components import (
-    Group,
     Component,
+    Group,
     as_bool,
     from_preference_node,
 )
@@ -56,15 +56,24 @@ class Preferences(QtCore.QSettings):
         self._file_path = None
 
     @classmethod
-    def from_file(cls, file_path: str) -> Preferences:
-        """Create preferences from a file."""
+    def from_file(
+        cls, file_path: str, application: Optional[str] = None
+    ) -> Preferences:
+        """Create preferences from a file.
+
+        Args:
+            file_path: The path to the preferences file.
+            application: The application name to use for the preferences. This
+                is useful if the same base preferences are used by multiple applications
+                but still
+        """
         preference_tree = load_preferences_from_file(file_path)
         components = get_components(preference_tree)
         settings = components[0]
         inst = cls(
             settings.name,
             settings.scope,
-            settings.application,
+            application or settings.application,
             settings.organization,
         )
         for component in components[1:]:
@@ -268,6 +277,15 @@ class PreferenceGroup(QtWidgets.QWidget):
         """
         widget = from_component(component)
         label = "" if component.type == component.Type.State else component.label
+        self.add_row(label, widget)
+
+    def add_row(self, label: str, widget: QtWidgets.QWidget) -> None:
+        """Add a row to the group.
+
+        Args:
+            label: The label for the widget.
+            widget: The widget to add.
+        """
         self._form_layout.add_row(label, widget)
 
     def add_widget(self, widget: QtWidgets.QWidget) -> None:
@@ -285,7 +303,6 @@ class Tabs(QtWidgets.QTabWidget):
         super().__init__(parent=parent)
 
     def add_tab(self, node: PreferenceNode, preferences: Preferences) -> None:
-        # self.addTab(widget, title)
         widget = create_preferences_widget(preferences, node)
         self.addTab(widget, node.label)
 
@@ -327,16 +344,27 @@ def create_group(node: PreferenceNode, preferences: Preferences) -> PreferenceGr
         node.collapsible if node.has_property("collapsible") else "false"
     )
     grp = PreferenceGroup(node.label, collapsible)
+
     for child in node.children:
+        if child.has_property("visible") and not as_bool(child.visible):
+            continue
+
         if child.node_type == "Group":
             child_grp = create_group(child, preferences)
             grp.add_widget(child_grp)
+
+        elif child.node_type == "Compound":
+            compound = Compound.from_preference_node(child, preferences)
+            grp.add_row(child.label, compound)
+
         elif child.node_type == "Tabs":
             tabs = create_tabs(child, preferences)
             grp.add_widget(tabs)
+
         else:
             component = preferences.get_component(child.get_path())
             grp.add_component(component)
+
     return grp
 
 
@@ -362,14 +390,24 @@ def create_preferences_widget(
         preference_node = load_preferences_from_file(preferences.file_path)
 
     for child in preference_node.children:
+        if child.has_property("visible") and not as_bool(child.visible):
+            continue
+
         if child.node_type == "Settings":
             continue
+
         elif child.node_type == "Group":
             group = create_group(child, preferences)
             form_layout.add_widget(group)
+
+        elif child.node_type == "Compound":
+            compound = Compound.from_preference_node(child, preferences)
+            form_layout.add_row(child.label, compound)
+
         elif child.node_type == "Tabs":
             tabs = create_tabs(child, preferences)
             form_layout.add_widget(tabs)
+
         else:
             child_comp = preferences.get_component(child.get_path())
             child_widget = from_component(child_comp)
@@ -380,6 +418,60 @@ def create_preferences_widget(
 
     layout.addStretch()
     return widget
+
+
+class Compound(QtWidgets.QWidget):
+    """A Compound widget is a container of other preference widgets."""
+
+    value_changed = QtCore.Signal(object)
+
+    @classmethod
+    def from_preference_node(
+        cls, preference_node: PreferenceNode, preferences: Preferences
+    ) -> Compound:
+        inst = cls()
+        for child in preference_node.children:
+            child_component = from_preference_node(child)
+            child_component.set_preferences(preferences)
+            child_widget = from_component(child_component)
+            inst.add_widget(child_widget)
+        return inst
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent=parent)
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._widgets = []
+
+    def add_widget(self, widget: QtWidgets.QWidget):
+        self._widgets.append(widget)
+        widget.value_changed.connect(self._on_value_changed)
+        self.layout().addWidget(widget)
+
+    @QtCore.Slot()
+    def _on_value_changed(self):
+        self.value_changed.emit(self.get_value())
+
+    def get_value(self):
+        return tuple(widget.get_value() for widget in self._widgets)
+
+    def set_value(self, value, read_only=False):
+        for idx, val in enumerate(value):
+            self._widgets[idx].set_value(val, read_only)
+
+    def restore_default(self):
+        for widget in self._widgets:
+            if isinstance(widget, PreferenceBase):
+                widget.restore_default()
+
+    def reload(self):
+        for widget in self._widgets:
+            if isinstance(widget, PreferenceBase):
+                widget.reload()
+
+    @property
+    def default(self):
+        return tuple(widget.default for widget in self._widgets)
 
 
 class PreferencesWidget(QtWidgets.QWidget):

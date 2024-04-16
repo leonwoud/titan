@@ -148,18 +148,13 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
         self._data_type = data_type
         self._validator = None
         self._component = None
-        # Using QRegularExpressionValidator for int and float types
-        # instead of QIntValidator and QDoubleValidator.
         if self._data_type in (int, float):
             if self._data_type == float:
-                regex = QtCore.QRegularExpression(
-                    "^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$"
-                )
+                self._validator = QtGui.QDoubleValidator(self)
             elif self._data_type == int:
-                regex = QtCore.QRegularExpression("^-?\\d+$")
-            self._validator = QtGui.QRegularExpressionValidator(regex, self)
+                self._validator = QtGui.QIntValidator(self)
             self.setValidator(self._validator)
-        self.setText(str(value))
+        self.setText(str(value or ""))
         self.editingFinished.connect(self._on_editing_finished)
 
     @QtCore.Slot()
@@ -174,11 +169,12 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
         self.set_value(value)
 
     def get_value(self):
-        return self._data_type(self.text())
+        if self.text():
+            return self._data_type(self.text())
 
     def set_value(self, value: DataTypes, read_only: bool = False):
         """Set the value in the widget."""
-        self.setText(str(value))
+        self.setText(str(value or ""))
         super().set_value(value, read_only)
 
 

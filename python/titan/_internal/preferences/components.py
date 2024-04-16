@@ -86,6 +86,8 @@ class Component:
             raise ValueError(
                 f"{node.node_type} ({node.name}) must have a default attribute."
             )
+        if node.default == "null":
+            node.default = None
 
     @classmethod
     def from_preference_node(cls, node: PreferenceNode) -> Component:
@@ -102,7 +104,7 @@ class Component:
         value = self.preferences.get_value(self.path)
         if value is None:
             value = self.default
-        if hasattr(self, "data_type"):
+        if value and hasattr(self, "data_type"):
             return self.data_type(value)
         return value
 
@@ -184,7 +186,7 @@ class Field(Component):
     ):
         super().__init__(name, path, label=label)
         self.data_type = self.DataTypes.get(data_type)
-        self.default = self.data_type(default)
+        self.default = self.data_type(default) if default else None
         self.range = tuple(self.data_type(i) for i in range_) if range_ else None
 
     @classmethod
@@ -194,11 +196,12 @@ class Field(Component):
             raise ValueError(f"Field '{node.name}' must have a type attribute.")
 
         # Validate we can convert the default value to the specified data type
-        data_type = cls.DataTypes.get(node.type)
-        try:
-            data_type(node.default)
-        except ValueError:
-            raise ValueError(f"Invalid default value for field {node.name}")
+        if node.default:
+            data_type = cls.DataTypes.get(node.type)
+            try:
+                data_type(node.default)
+            except ValueError:
+                raise ValueError(f"Invalid default value for field {node.name}")
 
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
@@ -377,9 +380,7 @@ def as_bool(value: str) -> bool:
     """Convert a string to a boolean."""
     if not isinstance(value, str):
         return bool(value)
-    if value.lower() in ("true", "1"):
-        return True
-    return False
+    return value.lower() in ("true", "1")
 
 
 def from_preference_node(node: PreferenceNode) -> Component:
