@@ -2,8 +2,8 @@
 
 >>> # Open a serialized log file and display it in the logger GUI
 >>> from titan.resources import find_resource
->>> from titan._internal.logger.gui.main import TitanLogger
->>> gui_logger = TitanLogger("Example")
+>>> from titan._internal.logger.gui.main import LoggerWidget
+>>> gui_logger = LoggerWidget("Example")
 >>> log_file = find_resource("log_examples.dat")
 >>> gui_logger.load_log(log_file)
 >>> gui_logger.show()
@@ -20,9 +20,15 @@ from .view import TitanLoggerView
 from .header import Headers, Levels
 from .io import write_records, read_records
 
+from titan._internal.preferences.main import PreferencesDialog
 from titan.preferences import Preferences
 from titan.qt import QtCore, QtGui, QtWidgets
 from titan.resources import find_resource
+
+from titan._internal.qt.utils import (
+    restore_window_size_and_position,
+    store_window_size_and_position,
+)
 
 
 # Constants
@@ -55,16 +61,85 @@ def get_logger_model(
     return LOGGER_MODELS[name]
 
 
-class TitanLogger(QtWidgets.QWidget):
-
+class LoggerWindow(QtWidgets.QMainWindow):
     def __init__(
         self, name: Optional[str] = None, parent: Optional[QtWidgets.QWidget] = None
+    ) -> None:
+        super().__init__(parent=parent)
+        self.setWindowTitle("Titan Logger")
+        self._preferences = get_logger_preferences(name)
+        self._logger = LoggerWidget(name, self._preferences, self)
+        self.setCentralWidget(self._logger)
+        self._init_menu()
+        self._prefs_widget = None
+
+    def _init_menu(self) -> None:
+        menu_bar = self.menuBar()
+        file_menu = menu_bar.addMenu("&File")
+        edit_menu = menu_bar.addMenu("&Edit")
+        save_action = QtWidgets.QAction("&Save", self)
+        save_action.triggered.connect(self._on_save)
+        edit_prefs = QtWidgets.QAction("&Preferences", self)
+        edit_prefs.triggered.connect(self._on_edit_prefs)
+        file_menu.addAction(save_action)
+        edit_menu.addAction(edit_prefs)
+
+    @QtCore.Slot()
+    def _on_save(self) -> None:
+        file_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save Log", "", "Log Files (*.dat)"
+        )
+        if file_path:
+            self._logger.save_log(file_path)
+
+    @QtCore.Slot()
+    def _on_refresh_requested(self):
+        print("REFRESH PLEASE!")
+
+    @QtCore.Slot()
+    def _on_edit_prefs(self) -> None:
+        if self._prefs_widget:
+            self._prefs_widget.show()
+            self._prefs_widget.raise_()
+            return
+        self._prefs_widget = PreferencesDialog(self._preferences, parent=self)
+        self._prefs_widget.refresh_requested.connect(self._on_refresh_requested)
+        self._prefs_widget.show()
+
+    def open_log(self, file_path: str) -> None:
+        """Open a log file and display it in the logger GUI."""
+        self._logger.load_log(file_path)
+
+    def showEvent(self, event: QtCore.QEvent) -> None:
+        """Restore the window state when the logger is shown."""
+        # TODO: Only do this is the window is floating, right now it will be
+        restore_window_size_and_position(self, self._preferences)
+        event.accept()
+
+    def closeEvent(self, event: QtCore.QEvent) -> None:
+        """Close the log records when the logger window is closed."""
+        # Store the window state on close
+        store_window_size_and_position(self, self._preferences)
+        self._logger.close_record_infos()
+        event.accept()
+
+
+class LoggerWidget(QtWidgets.QWidget):
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        preferences: Optional[Preferences] = None,
+        parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent=parent)
         self._table_view = None
         self._tabel_model = None
         self._name = name
-        self._preferences = get_logger_preferences(name)
+        if preferences is None:
+            self._preferences = get_logger_preferences(name)
+        else:
+            self._preferences = preferences
         self._init_ui()
         self._record_infos = []
 
@@ -85,7 +160,6 @@ class TitanLogger(QtWidgets.QWidget):
         self._copy_action.triggered.connect(self._on_copy)
         self._copy_action.setShortcut(QtGui.QKeySequence.Copy)
         self.addAction(self._copy_action)
-
         self.setStyleSheet("QTableView {border: 2px solid transparent;}")
 
     @QtCore.Slot(int, list)
@@ -138,33 +212,14 @@ class TitanLogger(QtWidgets.QWidget):
         """Loads the log records from a file."""
         self._table_model.set_log_records(read_records(file_path))
 
-    def showEvent(self, event: QtCore.QEvent) -> None:
-        """Restore the window state when the logger is shown."""
-        # TODO: Only do this if this widget isn't embedded in another window
-        self.resize(
-            self._preferences.win.width.value, self._preferences.win.height.value
-        )
-        x_pos = self._preferences.win.pos.x.value
-        y_pos = self._preferences.win.pos.y.value
-        # Will only be None the first time the window is shown, after that the
-        # position will be stored in the preferences
-        if x_pos is None:
-            desktop_geometry = QtWidgets.QApplication.desktop().screenGeometry()
-            x_pos = (desktop_geometry.width() - self.width()) // 2
-            y_pos = (desktop_geometry.height() - self.height()) // 2
-        self.move(x_pos, y_pos)
-        event.accept()
+    def clear_log(self) -> None:
+        """Clear the log records."""
+        self._table_model.clear_log()
 
-    def closeEvent(self, event: QtCore.QEvent) -> None:
-        """Close the log records when the TitanLogger is closed."""
+    def close_record_infos(self) -> None:
+        """Close all the record info widgets."""
         for info in self._record_infos:
             info.close()
-        # Store the window state on close
-        self._preferences.win.width.value = self.width()
-        self._preferences.win.height.value = self.height()
-        self._preferences.win.pos.x.value = self.x()
-        self._preferences.win.pos.y.value = self.y()
-        event.accept()
 
 
 class TitanLogHandler(logging.Handler):

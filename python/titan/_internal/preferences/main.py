@@ -254,6 +254,8 @@ class PreferenceFormLayout(QtWidgets.QFormLayout):
 
 class PreferenceGroup(QtWidgets.QWidget):
 
+    refresh_requested = QtCore.Signal()
+
     def __init__(
         self,
         title: str,
@@ -277,6 +279,7 @@ class PreferenceGroup(QtWidgets.QWidget):
         """
         widget = from_component(component)
         label = "" if component.type == component.Type.State else component.label
+        widget.value_changed.connect(self.refresh_requested)
         self.add_row(label, widget)
 
     def add_row(self, label: str, widget: QtWidgets.QWidget) -> None:
@@ -286,6 +289,7 @@ class PreferenceGroup(QtWidgets.QWidget):
             label: The label for the widget.
             widget: The widget to add.
         """
+        widget.value_changed.connect(self.refresh_requested)
         self._form_layout.add_row(label, widget)
 
     def add_widget(self, widget: QtWidgets.QWidget) -> None:
@@ -294,16 +298,20 @@ class PreferenceGroup(QtWidgets.QWidget):
         Args:
             widget: The widget to add.
         """
+        widget.refresh_requested.connect(self.refresh_requested)
         self._form_layout.add_widget(widget)
 
 
 class Tabs(QtWidgets.QTabWidget):
+
+    refresh_requested = QtCore.Signal()
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
     def add_tab(self, node: PreferenceNode, preferences: Preferences) -> None:
         widget = create_preferences_widget(preferences, node)
+        widget.refresh_requested.connect(self.refresh_requested)
         self.addTab(widget, node.label)
 
 
@@ -368,9 +376,17 @@ def create_group(node: PreferenceNode, preferences: Preferences) -> PreferenceGr
     return grp
 
 
+class PreferenceWidget(QtWidgets.QWidget):
+
+    refresh_requested = QtCore.Signal()
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent=parent)
+
+
 def create_preferences_widget(
     preferences: Preferences, preference_node: Optional[PreferenceNode] = None
-) -> QtWidgets.QWidget:
+) -> PreferenceWidget:
     """Create a preferences widget from a preference structure.
 
     Args:
@@ -379,9 +395,9 @@ def create_preferences_widget(
             preferences will be loaded from the preferences file contained in the preferences object.
 
     Returns:
-        The created preferences widget.
+        PreferenceWidget: The created preferences widget.
     """
-    widget = QtWidgets.QWidget()
+    widget = PreferenceWidget()
     layout = QtWidgets.QVBoxLayout(widget)
     form_layout = PreferenceFormLayout()
     layout.addLayout(form_layout)
@@ -398,14 +414,17 @@ def create_preferences_widget(
 
         elif child.node_type == "Group":
             group = create_group(child, preferences)
+            group.refresh_requested.connect(widget.refresh_requested)
             form_layout.add_widget(group)
 
         elif child.node_type == "Compound":
             compound = Compound.from_preference_node(child, preferences)
+            compound.value_changed.connect(widget.refresh_requested)
             form_layout.add_row(child.label, compound)
 
         elif child.node_type == "Tabs":
             tabs = create_tabs(child, preferences)
+            tabs.refresh_requested.connect(widget.refresh_requested)
             form_layout.add_widget(tabs)
 
         else:
@@ -414,6 +433,7 @@ def create_preferences_widget(
             # We make the label a blank string for State components, as the label is
             # already displayed on the checkbox itself.
             label = "" if child_comp.type == child_comp.Type.State else child_comp.label
+            child_widget.value_changed.connect(widget.refresh_requested)
             form_layout.add_row(label, child_widget)
 
     layout.addStretch()
@@ -474,7 +494,10 @@ class Compound(QtWidgets.QWidget):
         return tuple(widget.default for widget in self._widgets)
 
 
-class PreferencesWidget(QtWidgets.QWidget):
+class PreferencesDialog(QtWidgets.QDialog):
+
+    refresh_requested = QtCore.Signal()
+
     def __init__(
         self, preferences: Preferences, parent: Optional[QtWidgets.QWidget] = None
     ):
@@ -483,6 +506,7 @@ class PreferencesWidget(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._preferences_widget = create_preferences_widget(preferences)
+        self._preferences_widget.refresh_requested.connect(self.refresh_requested)
         layout.addWidget(self._preferences_widget)
         self._watcher = QtCore.QFileSystemWatcher(self)
         self._watcher.fileChanged.connect(self.reload)

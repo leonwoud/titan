@@ -1,3 +1,4 @@
 
 - Temporarily set sys.dont_write_bytecode as titan init
 - Proper install/setup
+- Include for common preferences (e.g window prefs)
