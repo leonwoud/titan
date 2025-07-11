@@ -70,7 +70,7 @@ class ColorPicker(QtWidgets.QPushButton):
         """Overriden function."""
         super(ColorPicker, self).paintEvent(event)
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(painter.Antialiasing)
+        # painter.setRenderHint(QtGui.QPainter.Antialiasing, True)  TODO: Crashes in Qt6
         height = self.rect().height()
         width = self.rect().width()
         top = QtCore.QPoint(width, height - 5)

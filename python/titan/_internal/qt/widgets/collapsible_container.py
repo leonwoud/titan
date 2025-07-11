@@ -64,7 +64,7 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
         is_collapsible: Optional[bool] = True,
         parent: Optional[QtWidgets.QWidget] = None,
     ):
-        super(_CollapsibleTitleBar, self).__init__(label, parent=parent)
+        super().__init__(label, parent=parent)
         self._is_collapsible = is_collapsible
         self._collapsed = False
         self.setFixedHeight(height)
@@ -90,8 +90,8 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         """Reimplement to draw the title bar."""
         painter = QtGui.QPainter(self)
-        painter.initFrom(self)
-        painter.setRenderHint(painter.Antialiasing, True)
+        # painter.initFrom(self)  TODO: Doesn't work in Qt6
+        # painter.setRenderHint(QtGui.QPainter.Antialiasing, True)  TODO: Crashes in Qt6
         color = self.palette().color(QtGui.QPalette.Light)
         text_color = self.palette().color(QtGui.QPalette.ButtonText)
         # Draw the background color

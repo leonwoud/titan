@@ -23,17 +23,19 @@ def block_signals(widgets: list[QtWidgets.QWidget]):
         widget.blockSignals(False)
 
 
-class PreferenceBase(QtCore.QObject):
+class PreferenceBase:
     """Base class for preference widgets.
 
     This class provides a common interface for preference widgets to be used in the preferences
     dialog. It provides a way to get and set values from the preferences and a way to reset the
     values to their defaults.
+
+    NOTE:
+        MRO changes in Qt6 means this can no longer inherit from QObject, this is now a mix-in that
+        assumes the QtObject class implements value_changed signal.
     """
 
-    value_changed = QtCore.Signal(object)
-
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         super().__init__()
         self._component = None
         self._default = None
@@ -74,6 +76,8 @@ class PreferenceBase(QtCore.QObject):
 
 class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
     """A checkbox preference widget."""
+
+    value_changed = QtCore.Signal(object)
 
     @classmethod
     def from_component(cls, component: Component):
@@ -122,6 +126,8 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
     integers, or floats. The widget will validate the input based on the data type and
     range provided.
     """
+
+    value_changed = QtCore.Signal(object)
 
     @classmethod
     def from_component(cls, component: Component):
@@ -181,6 +187,8 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
 class ComboBox(QtWidgets.QComboBox, PreferenceBase):
     """A combobox preference widget."""
 
+    value_changed = QtCore.Signal(object)
+
     @classmethod
     def from_component(cls, component: Component):
         inst = cls(
@@ -217,6 +225,8 @@ class ComboBox(QtWidgets.QComboBox, PreferenceBase):
 
 class ColorPicker(QtWidgets.QWidget, PreferenceBase):
     """A color picker preference widget."""
+
+    value_changed = QtCore.Signal(object)
 
     @classmethod
     def from_component(cls, component: Component):
@@ -270,6 +280,8 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
 class RadioButtons(QtWidgets.QWidget, PreferenceBase):
     """A radio button preference widget."""
 
+    value_changed = QtCore.Signal(object)
+
     @classmethod
     def from_component(cls, component: Component):
         inst = cls(component.value, component.default, component.items())
@@ -316,9 +328,6 @@ class RadioButtons(QtWidgets.QWidget, PreferenceBase):
 class Slider(QtWidgets.QWidget, PreferenceBase):
     """A slider preference widget."""
 
-    # value_changed signal is added here (overriding the PreferenceBase)
-    # to avoid the signals and slots in QMetaObject Sort Warning and
-    # allow connections to be made to the signal without problems.
     value_changed = QtCore.Signal(object)
 
     FieldPositionLeft = "left"

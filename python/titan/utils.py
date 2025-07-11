@@ -7,6 +7,9 @@ class _MetaDummyClass(type):
     """A metaclass that allows DummyClass to be used as a stand-in for any
     class that is not available in the current environment."""
 
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
     def __getattr__(cls, name: str) -> Callable[..., DummyClass]:
         return DummyClass
 

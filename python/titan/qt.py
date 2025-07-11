@@ -2,20 +2,38 @@ from __future__ import absolute_import
 
 from titan.utils import DummyClass, dummy_function
 
-try:
-    from shiboken2 import wrapInstance as wrap_instance
-    from PySide2 import QtCore, QtGui, QtWidgets, QtQuickWidgets
+QT_AVAILABLE = False
+wrap_instance = None
+QtCore = QtGui = QtWidgets = QtQuickWidgets = None
 
-    QT_AVAILABLE = True
+qt_bindings = [
+    ("PySide2", "shiboken2"),
+    ("PySide6", "shiboken6"),
+]
 
-except ImportError:
+for qt_mod, shiboken_mod in qt_bindings:
+    try:
+        qt = __import__(qt_mod, fromlist=["QtCore", "QtGui", "QtWidgets", "QtQuickWidgets"])
+        shiboken = __import__(shiboken_mod, fromlist=["wrapInstance"])
+
+        QtCore = getattr(qt, "QtCore")
+        QtGui = getattr(qt, "QtGui")
+        QtWidgets = getattr(qt, "QtWidgets")
+        QtQuickWidgets = getattr(qt, "QtQuickWidgets")
+        wrap_instance = getattr(shiboken, "wrapInstance")
+
+        QT_AVAILABLE = True
+        break
+    except ImportError:
+        continue
+
+
+if not QT_AVAILABLE:
     QtCore = DummyClass
     QtGui = DummyClass
     QtWidgets = DummyClass
     QtQuickWidgets = DummyClass
     wrap_instance = dummy_function
-
-    QT_AVAILABLE = False
 
 
 def is_qt_app():
