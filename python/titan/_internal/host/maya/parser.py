@@ -3,8 +3,11 @@ from __future__ import absolute_import
 from contextlib import contextmanager
 import json
 import re
+from typing import TYPE_CHECKING, cast
 
 from titan.logger import get_logger, log_execution_time
+if TYPE_CHECKING:
+    from titan._internal.logger import TitanLogger
 
 LOGGER_NAME = "titan.host.maya.parser"
 
@@ -27,13 +30,13 @@ class FileInfoExtractor(object):
     BINARY_FILE_HEADER = b"FOR8"
 
     @classmethod
-    @log_execution_time("titan.host.maya.parser")
+    @log_execution_time(LOGGER_NAME)
     def get_file_info(cls, file_path):
         """Return a list of file info objects from the given file path. This
         method will check if the file is a Maya binary or ASCII file and
         extract the file info accordingly."""
         # Check if this is a Maya binary
-        log = get_logger(LOGGER_NAME)
+        log = cast(TitanLogger, get_logger(LOGGER_NAME))
         log.debug("Opening %s", file_path)
         with open(file_path, "rb") as handle:
             if cls._peek(handle, len(cls.BINARY_FILE_HEADER)) == cls.BINARY_FILE_HEADER:
@@ -149,7 +152,7 @@ class FileInfo(object):
         tokenized = re.findall('(?:".*?"|\S)+', line)
         unpacked = [token[1:-1] for token in tokenized[1:]]
         inst = cls(unpacked[0], unpacked[1])
-        log = get_logger(LOGGER_NAME)
+        log = cast(TitanLogger, get_logger(LOGGER_NAME))
         log.trace(">> %s" % inst)
         return inst
 
@@ -161,7 +164,7 @@ class FileInfo(object):
         data = handle.read(size)
         unpacked = [bytes(b).decode("ascii") for b in data.split(b"\x00") if b]
         inst = cls(unpacked[0], unpacked[1])
-        log = get_logger(LOGGER_NAME)
+        log = cast(TitanLogger, get_logger(LOGGER_NAME))
         log.trace(">> %s" % inst)
         return inst
 

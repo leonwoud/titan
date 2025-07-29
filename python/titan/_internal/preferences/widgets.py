@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Optional
+from typing import Optional, cast
 
 from titan.qt import QtCore, QtGui, QtWidgets
 from titan.widgets import (
@@ -10,7 +10,17 @@ from titan.widgets import (
     IntSlider,
 )
 
-from titan._internal.preferences.components import Component, DataTypes, Number
+from titan._internal.preferences.components import (
+    Component,
+    Color as ColorCmpnt,
+    Combo as ComboCmpnt,
+    Field as FieldCmpnt,
+    Radio as RadioCmpnt,
+    Slider as SliderCmpnt,
+    State as StateCmpnt,
+    DataTypes,
+    Number,
+)
 
 
 @contextmanager
@@ -58,7 +68,8 @@ class PreferenceBase:
         if not read_only:
             if self._component:
                 self._component.preferences.set_value(self._component.path, value)
-        self.value_changed.emit(value)
+        # value_changed must be implemented on subclassed of PreferenceBase
+        self.value_changed.emit(value)  # type: ignore
 
     def restore_default(self):
         """Reset the widget to its default value."""
@@ -80,8 +91,9 @@ class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
     value_changed = QtCore.Signal(object)
 
     @classmethod
-    def from_component(cls, component: Component):
-        inst = cls(component.value, component.default, component.label)
+    def from_component(cls, component: Component) -> CheckBox:
+        component = cast(StateCmpnt, component)
+        inst = cls(component.value, cast(bool, component.default), component.label)
         inst.set_component(component)
         return inst
 
@@ -92,7 +104,7 @@ class CheckBox(QtWidgets.QCheckBox, PreferenceBase):
         label: Optional[str] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ):
-        super().__init__(label, parent=parent)
+        super().__init__(label or "", parent=parent)
         self._default = default
         self.setChecked(value)
         self._update_label_font(value)
@@ -130,12 +142,13 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
     value_changed = QtCore.Signal(object)
 
     @classmethod
-    def from_component(cls, component: Component):
+    def from_component(cls, component: Component) -> Field:
+        component = cast(FieldCmpnt, component)
         inst = cls(
             component.data_type,
-            component.value,
-            component.default,
-            range_=component.range,
+            cast(int | str | float, component.value),
+            cast(int | str | float, component.default),
+            range_=cast(tuple[Number, Number], component.range),
         )
         inst.set_component(component)
         return inst
@@ -152,14 +165,15 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
         self._default = default
         self._range = range_
         self._data_type = data_type
-        self._validator = None
+        self._validator: Optional[QtGui.QDoubleValidator | QtGui.QIntValidator] = None
         self._component = None
         if self._data_type in (int, float):
             if self._data_type == float:
                 self._validator = QtGui.QDoubleValidator(self)
             elif self._data_type == int:
                 self._validator = QtGui.QIntValidator(self)
-            self.setValidator(self._validator)
+            if self._validator:
+                self.setValidator(self._validator)
         self.setText(str(value or ""))
         self.editingFinished.connect(self._on_editing_finished)
 
@@ -167,14 +181,17 @@ class Field(QtWidgets.QLineEdit, PreferenceBase):
     def _on_editing_finished(self):
         """Checks if the value is within the range and sets it if it is not."""
         value = self.get_value()
+        if not value:
+            return
         if self._range is not None:
+            value = cast(Number, value)
             if value < self._range[0]:
                 value = self._range[0]
             elif value > self._range[1]:
                 value = self._range[1]
         self.set_value(value)
 
-    def get_value(self):
+    def get_value(self) -> Optional[int | str | float]:
         if self.text():
             return self._data_type(self.text())
 
@@ -191,8 +208,12 @@ class ComboBox(QtWidgets.QComboBox, PreferenceBase):
 
     @classmethod
     def from_component(cls, component: Component):
+        component = cast(ComboCmpnt, component)
         inst = cls(
-            component.data_type, component.value, component.default, component.items()
+            component.data_type,
+            cast(str, component.value),
+            cast(str, component.default),
+            component.items(),
         )
         inst.set_component(component)
         return inst
@@ -229,8 +250,9 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
     value_changed = QtCore.Signal(object)
 
     @classmethod
-    def from_component(cls, component: Component):
-        inst = cls(component.value, component.default)
+    def from_component(cls, component: Component) -> ColorPicker:
+        component = cast(ColorCmpnt, component)
+        inst = cls(cast(QtGui.QColor, component.value), cast(str, component.default))
         inst.set_component(component)
         return inst
 
@@ -251,7 +273,7 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
         self._default = default
 
     @staticmethod
-    def _as_str(color):
+    def _as_str(color) -> str:
         r, g, b, a = color.getRgb()
         return f"{r},{g},{b},{a}"
 
@@ -264,11 +286,11 @@ class ColorPicker(QtWidgets.QWidget, PreferenceBase):
     def get_value(self):
         return self._color
 
-    def set_value(self, value: str, read_only: bool = False):
+    def set_value(self, value: str, read_only: bool = False) -> None:
         self._picker.set_csv(value)
         self._color = value
 
-    def reload(self):
+    def reload(self) -> None:
         """Reload the value from the preferences."""
         if not self._component:
             return
@@ -284,7 +306,12 @@ class RadioButtons(QtWidgets.QWidget, PreferenceBase):
 
     @classmethod
     def from_component(cls, component: Component):
-        inst = cls(component.value, component.default, component.items())
+        component = cast(RadioCmpnt, component)
+        inst = cls(
+            cast(bool, component.value),
+            cast(bool, component.default),
+            component.items(),
+        )
         inst.set_component(component)
         return inst
 
@@ -317,7 +344,7 @@ class RadioButtons(QtWidgets.QWidget, PreferenceBase):
         value = self._items[self._btn_grp.checkedId()]
         super().set_value(value)
 
-    def get_value(self) -> bool:
+    def get_value(self) -> DataTypes:
         return self._items[self._btn_grp.checkedId()]
 
     def set_value(self, value: DataTypes, read_only: bool = False) -> None:
@@ -336,12 +363,13 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
 
     @classmethod
     def from_component(cls, component: Component):
+        component = cast(SliderCmpnt, component)
         inst = cls(
             component.data_type,
-            component.value,
-            component.default,
-            component.range,
-            component.step,
+            cast(Number, component.value),
+            cast(Number, component.default),
+            cast(tuple[Number, Number], component.range),
+            cast(Number, component.step),
             component.field,
         )
         inst.set_component(component)
@@ -350,8 +378,8 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
     def __init__(
         self,
         data_type: type,
-        value: DataTypes,
-        default: DataTypes,
+        value: Number,
+        default: Number,
         range_: tuple[Number, Number],
         step: Number,
         field: str,
@@ -365,7 +393,7 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         if data_type == int:
-            self._slider = IntSlider(range_[0], range_[1], step)
+            self._slider = IntSlider(int(range_[0]), int(range_[1]), int(step))
         elif data_type == float:
             self._slider = FloatSlider(range_[0], range_[1], step)
         self._slider.set_value(value)
@@ -384,13 +412,13 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
         self._field.value_changed.connect(self._on_field_changed)
 
     @QtCore.Slot(object)
-    def _on_slider_changed(self, value: object) -> None:
+    def _on_slider_changed(self, value: Number) -> None:
         with block_signals([self._field]):
             self._field.set_value(value)
         super().set_value(value)
 
     @QtCore.Slot(object)
-    def _on_field_changed(self, value: object) -> None:
+    def _on_field_changed(self, value: Number) -> None:
         if value < self._range[0]:
             value = self._range[0]
         elif value > self._range[1]:
@@ -399,7 +427,7 @@ class Slider(QtWidgets.QWidget, PreferenceBase):
             self._slider.set_value(value)
 
     @QtCore.Slot()
-    def get_value(self) -> DataTypes:
+    def get_value(self) -> Optional[DataTypes]:
         return self._field.get_value()
 
     def set_value(self, value: DataTypes, read_only: bool = False) -> None:

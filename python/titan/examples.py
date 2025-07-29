@@ -6,7 +6,7 @@ class ExampleCallback:
     """Example of a callback that listens for selection changes in Maya.
 
     >>> from titan.examples import ExampleCallback
-    >>> example = ExampleCallback(
+    >>> example = ExampleCallback()
     >>> # This logs selection changes in Maya
     >>> del example
     >>> # The callback is no longer active, the registered callback is removed

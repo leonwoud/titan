@@ -1,19 +1,23 @@
 from enum import IntEnum
 from functools import partial
 import logging
+from typing import Union
 
 from titan.qt import QtCore, QtWidgets
 from .filters import TextFilter, DropDownFilter
 
 
 # Headers for the table view
-class Headers(IntEnum):
+class _Headers(IntEnum):
+    label: str
 
     def __new__(cls, value, label):
         obj = int.__new__(cls, value)
         obj._value_ = value
         setattr(obj, "label", label)
         return obj
+
+class Headers(_Headers):
 
     Time = (0, "Time")
     Level = (1, "Level")
@@ -29,9 +33,8 @@ Filters = {
     Headers.Message: TextFilter,
 }
 
-
-# Log levels
-class Levels(IntEnum):
+class _LevelEnum(IntEnum):
+    level_name: str
 
     def __new__(cls, level_num, level_name):
         obj = int.__new__(cls, level_num)
@@ -39,8 +42,12 @@ class Levels(IntEnum):
         setattr(obj, "level_name", level_name)
         return obj
 
+
+# Log levels
+class Levels(_LevelEnum):
+
     Any = (9999, "ANY")
-    Trace = (logging.TRACE, "TRACE")
+    Trace = (logging.TRACE, "TRACE") # type: ignore
     Debug = (logging.DEBUG, "DEBUG")
     Info = (logging.INFO, "INFO")
     Warning = (logging.WARNING, "WARNING")
@@ -48,7 +55,7 @@ class Levels(IntEnum):
     Critical = (logging.CRITICAL, "CRITICAL")
 
 
-def split_seq(value: str) -> tuple[str]:
+def split_seq(value: str) -> tuple[str, ...]:
     """Splits comma-separated values into a sequence."""
     values = (x.strip() for x in value.split(","))
     return tuple(x for x in values if x)
@@ -61,20 +68,20 @@ class TitanLoggerFilterHeaderView(QtWidgets.QHeaderView):
     filter_changed = QtCore.Signal(int, list)
 
     def __init__(
-        self, orientation: QtCore.Qt.Orientation, parent: QtWidgets.QWidget
+        self, orientation: QtCore.Qt.Orientation, parent: QtWidgets.QTableView
     ) -> None:
         super().__init__(orientation, parent)
         self._filters = []
         self._padding = 2
         self.setStretchLastSection(True)
-        self.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.setDefaultAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
         self.setSortIndicatorShown(False)
         self.setSectionsMovable(True)
         self.sectionResized.connect(self.adjust_positions)
         parent.horizontalScrollBar().valueChanged.connect(self.adjust_positions)
 
-    def sizeHint(self) -> int:
+    def sizeHint(self) -> QtCore.QSize:
         """Returns the size hint for the header view."""
         size = super().sizeHint()
         if self._filters:
@@ -101,7 +108,7 @@ class TitanLoggerFilterHeaderView(QtWidgets.QHeaderView):
             filter.move(x, y)
             filter.resize(self.sectionSize(index), height)
 
-    def add_filter(self, log_filter: QtCore.QObject) -> None:
+    def add_filter(self, log_filter: Union[TextFilter, DropDownFilter]) -> None:
         """Adds a filter to the header view."""
         cur_index = len(self._filters)
         self._filters.append(log_filter)

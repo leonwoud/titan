@@ -72,7 +72,8 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
         self.clicked.connect(self._on_clicked)
         self.setSizePolicy(
             QtWidgets.QSizePolicy(
-                QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Fixed,
             )
         )
 
@@ -90,15 +91,14 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         """Reimplement to draw the title bar."""
         painter = QtGui.QPainter(self)
-        # painter.initFrom(self)  TODO: Doesn't work in Qt6
-        # painter.setRenderHint(QtGui.QPainter.Antialiasing, True)  TODO: Crashes in Qt6
-        color = self.palette().color(QtGui.QPalette.Light)
-        text_color = self.palette().color(QtGui.QPalette.ButtonText)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        color = self.palette().color(QtGui.QPalette.ColorRole.Light)
+        text_color = self.palette().color(QtGui.QPalette.ColorRole.ButtonText)
         # Draw the background color
         painter.fillRect(0, 0, event.rect().width(), self.minimumHeight(), color)
         # Draw the arrow icon
         if self._is_collapsible:
-            y_offset = (self._height - 11) / 2
+            y_offset = int((self._height - 11) / 2)
             painter.drawPixmap(
                 8, y_offset, _get_pixmap(self._collapsed, text_color.name())
             )
@@ -110,7 +110,8 @@ class _CollapsibleTitleBar(QtWidgets.QPushButton):
                 0,
                 event.rect().width(),
                 self.minimumHeight(),
-                QtCore.Qt.AlignVCenter | QtCore.Qt.AlignLeft,
+                QtCore.Qt.AlignmentFlag.AlignVCenter
+                | QtCore.Qt.AlignmentFlag.AlignLeft,
                 self.text(),
             )
 
@@ -126,7 +127,9 @@ class ContentsWidget(QtWidgets.QFrame):
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
-        self.setFrameStyle(QtWidgets.QFrame.StyledPanel | QtWidgets.QFrame.Sunken)
+        self.setFrameStyle(
+            QtWidgets.QFrame.Shape.StyledPanel | QtWidgets.QFrame.Shadow.Sunken
+        )
 
 
 class CollapsibleContainer(QtWidgets.QWidget):
@@ -144,14 +147,14 @@ class CollapsibleContainer(QtWidgets.QWidget):
     def __init__(
         self,
         title: Optional[str] = None,
-        height: Optional[int] = 18,
+        height: int = 18,
         is_collapsible: Optional[bool] = True,
         parent: Optional[QtWidgets.QWidget] = None,
     ):
         super().__init__(parent=parent)
         self._height = height
         self._titlebar = _CollapsibleTitleBar(
-            title, height, is_collapsible=is_collapsible, parent=self
+            title or "", height, is_collapsible=is_collapsible, parent=self
         )
         self._contents = ContentsWidget(self)
         main_layout = QtWidgets.QVBoxLayout(self)
@@ -159,7 +162,7 @@ class CollapsibleContainer(QtWidgets.QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(self._titlebar)
         main_layout.addWidget(self._contents)
-        self._size_hint = None
+        self._size_hint: QtCore.QSize
         if is_collapsible:
             self._titlebar.clicked.connect(self._on_clicked)
 
@@ -206,7 +209,7 @@ if __name__ == "__main__":
     from titan.widgets import CollapsibleContainer
 
     widget = QtWidgets.QWidget()
-    widget.setWindowFlags(QtCore.Qt.Window)
+    widget.setWindowFlags(QtCore.Qt.WindowType.Window)
     layout = QtWidgets.QVBoxLayout(widget)
 
     container = CollapsibleContainer(
@@ -225,8 +228,8 @@ if __name__ == "__main__":
         line_edit = QtWidgets.QLineEdit(container_2.contents)
         form_layout_2.addRow(f"Line Edit {x}", line_edit)
 
-    layout.addWidget(container, alignment=QtCore.Qt.AlignTop)
-    layout.addWidget(container_2, alignment=QtCore.Qt.AlignTop)
+    layout.addWidget(container, alignment=QtCore.Qt.AlignmentFlag.AlignTop)
+    layout.addWidget(container_2, alignment=QtCore.Qt.AlignmentFlag.AlignTop)
 
     layout.addStretch()
     widget.show()

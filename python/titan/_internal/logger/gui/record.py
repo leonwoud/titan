@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
-from typing import Optional
+from typing import Any, Optional
 
-from titan.qt import QtCore, QtGui, QtWidgets
+from titan.qt import QT_VERSION, QtCore, QtGui, QtWidgets
 
 
 class TitanLogRecord:
@@ -34,20 +34,20 @@ class TitanLogRecord:
         return f"{self.time_str} : {self.level_name} : {self.name} : {self.msg}"
 
     def __init__(self):
-        self.created: float = None
-        self.time_str: str = None
-        self.file_name: str = None
-        self.module: str = None
-        self.name: str = None
-        self.msg: str = None
-        self.level_name: str = None
-        self.level_number: int = None
-        self.path_name: str = None
-        self.line_num: int = None
+        self.created: float
+        self.time_str: str
+        self.file_name: str
+        self.module: str
+        self.name: str
+        self.msg: str
+        self.level_name: str
+        self.level_number: int
+        self.path_name: str
+        self.line_num: int
         self.func: Optional[str] = None
         self.exc_text: Optional[str] = None
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, Any]:
         """Return the log record as a dictionary."""
         return {
             "created": self.created,
@@ -65,7 +65,7 @@ class TitanLogRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, str]) -> TitanLogRecord:
+    def from_dict(cls, data: dict[str, Any]) -> TitanLogRecord:
         """Create a TitanLogRecord from a dictionary."""
         inst = cls()
         inst.created = data["created"]
@@ -94,7 +94,7 @@ class DocumentFitTextEdit(QtWidgets.QTextEdit):
         self.setReadOnly(True)
 
     @QtCore.Slot(QtCore.QSizeF)
-    def _on_document_changed(self, size: QtCore.QSizeF):
+    def _on_document_changed(self, size: QtCore.QSize):
         """Resize the widget to fit the document size."""
         self.setMaximumHeight(size.height() + 5)
 
@@ -107,18 +107,24 @@ class ElidingLineEdit(QtWidgets.QLineEdit):
         self._text = text
         self.setReadOnly(True)
 
-    def resizeEvent(self, event: QtCore.QEvent) -> None:
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         """Resize the text to fit the widget."""
         fm = QtGui.QFontMetrics(self.font())
         self.setText(
-            fm.elidedText(self._text, QtCore.Qt.ElideRight, event.size().width())
+            fm.elidedText(
+                self._text, QtCore.Qt.TextElideMode.ElideRight, event.size().width()
+            )
         )
         event.accept()
 
     def sizeHint(self):
         """Return the size hint for the widget."""
         fm = QtGui.QFontMetrics(self.font())
-        return QtCore.QSize(fm.width(self._text), fm.height())
+        if QT_VERSION < 603000:  # horizontalAdvance replaces width in 6.3
+            fn = fm.width  # type: ignore
+        else:
+            fn = fm.horizontalAdvance  # type: ignore
+        return QtCore.QSize(fn(self._text), fm.height())
 
 
 class LogRecordInfo(QtWidgets.QWidget):
@@ -130,13 +136,17 @@ class LogRecordInfo(QtWidgets.QWidget):
     ) -> None:
         super().__init__(parent=parent)
         self.setWindowFlags(
-            QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint | QtCore.Qt.Popup
+            QtCore.Qt.WindowType.Window
+            | QtCore.Qt.WindowType.FramelessWindowHint
+            | QtCore.Qt.WindowType.Popup
         )
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         layout = QtWidgets.QFormLayout()
         layout.setContentsMargins(5, 5, 5, 5)
-        layout.setLabelAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTop)
+        layout.setLabelAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignTop
+        )
         main_layout.addLayout(layout)
         # Date
         date_txt = datetime.fromtimestamp(record.created).strftime(
@@ -175,15 +185,17 @@ class LogRecordInfo(QtWidgets.QWidget):
         main_layout.addStretch()
         self._resize_handle = QtWidgets.QSizeGrip(self)
         main_layout.addWidget(
-            self._resize_handle, alignment=QtCore.Qt.AlignBottom | QtCore.Qt.AlignRight
+            self._resize_handle,
+            alignment=QtCore.Qt.AlignmentFlag.AlignBottom
+            | QtCore.Qt.AlignmentFlag.AlignRight,
         )
 
-    def closeEvent(self, event: QtCore.QEvent) -> None:
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Emit the on_closed signal when the widget is closed."""
         self.on_closed.emit(self)
         super().closeEvent(event)
 
-    def showEvent(self, event: QtCore.Event) -> None:
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
         """Adjust the size of the widget to fit the contents."""
         super().showEvent(event)
         # This is a bit of a hack, we have to call adjustSize twice

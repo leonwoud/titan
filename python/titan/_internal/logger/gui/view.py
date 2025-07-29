@@ -1,7 +1,11 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 from titan.qt import QtCore, QtGui, QtWidgets
 from .header import Headers, Filters, Levels, TitanLoggerFilterHeaderView
+
+if TYPE_CHECKING:
+    from .main import FilterProxyModel
+    from .model import TitanLoggerModel
 
 
 class NoFocusDelegate(QtWidgets.QStyledItemDelegate):
@@ -9,11 +13,12 @@ class NoFocusDelegate(QtWidgets.QStyledItemDelegate):
         self,
         painter: QtGui.QPainter,
         option: QtWidgets.QStyleOptionViewItem,
-        index: QtCore.QModelIndex,
+        index: QtCore.QModelIndex | QtCore.QPersistentModelIndex,
     ) -> None:
         itemOption = QtWidgets.QStyleOptionViewItem(option)
-        if option.state & QtWidgets.QStyle.State_HasFocus:
-            itemOption.state = itemOption.state ^ QtWidgets.QStyle.State_HasFocus
+        # typing stubs seem incorrect, QStyleOptionViewItem does have a state attribute
+        if option.state & QtWidgets.QStyle.StateFlag.State_HasFocus:  # type: ignore
+            itemOption.state = itemOption.state ^ QtWidgets.QStyle.StateFlag.State_HasFocus  # type: ignore
         super().paint(painter, itemOption, index)
 
 
@@ -21,17 +26,23 @@ class TitanLoggerView(QtWidgets.QTableView):
 
     filter_changed = QtCore.Signal(int, list)
 
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
-        horiztonal_header = TitanLoggerFilterHeaderView(QtCore.Qt.Horizontal, self)
-        horiztonal_header.setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
+        horiztonal_header = TitanLoggerFilterHeaderView(
+            QtCore.Qt.Orientation.Horizontal, self
+        )
+        horiztonal_header.setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Interactive
+        )
         self.create_filters(horiztonal_header)
         self.setHorizontalHeader(horiztonal_header)
         horiztonal_header.setStretchLastSection(True)
         vertical_header = self.verticalHeader()
         vertical_header.hide()
         vertical_header.setDefaultSectionSize(20)
-        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
+        )
         self.setItemDelegate(NoFocusDelegate())
         self.setShowGrid(False)
         horiztonal_header.filter_changed.connect(self.filter_changed.emit)
@@ -48,7 +59,9 @@ class TitanLoggerView(QtWidgets.QTableView):
 
     def set_level_filter(self, level: str) -> None:
         """Set the level filter."""
-        level_filter = self.horizontalHeader().get_filter(Headers.Level)
+        level_filter = cast(
+            TitanLoggerFilterHeaderView, self.horizontalHeader()
+        ).get_filter(Headers.Level)
         level_filter.setCurrentText(level)
 
     def copy_selected(self) -> None:
@@ -57,10 +70,12 @@ class TitanLoggerView(QtWidgets.QTableView):
         indexes = selection_model.selectedIndexes()
         if not indexes:
             return
-        source_model = self.model().sourceModel()
+        source_model = cast(
+            TitanLoggerModel, cast(FilterProxyModel, self.model()).sourceModel()
+        )
         selection_model = self.selectionModel()
         selected_rows = [
-            self.model().mapToSource(index).row()
+            cast(FilterProxyModel, self.model()).mapToSource(index).row()
             for index in selection_model.selectedRows()
         ]
         records = [source_model.get_log_record(row) for row in selected_rows]

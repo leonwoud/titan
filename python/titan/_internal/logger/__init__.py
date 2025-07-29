@@ -1,14 +1,14 @@
 from __future__ import absolute_import
 
 import logging
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any, Mapping, Tuple
 
 TRACE_LEVEL = logging.DEBUG - 5
 
 
 class TitanLogger(logging.getLoggerClass()):
 
-    def __init__(self, name: str, level: Optional[int] = logging.NOTSET) -> None:
+    def __init__(self, name: str, level: int = logging.NOTSET) -> None:
         super(TitanLogger, self).__init__(name, level)
         logging.addLevelName(TRACE_LEVEL, "TRACE")
 
@@ -16,7 +16,7 @@ class TitanLogger(logging.getLoggerClass()):
         self, msg: str, *args: Tuple[Any, ...], **kwargs: Mapping[str, Any]
     ) -> None:
         if self.isEnabledFor(TRACE_LEVEL):
-            self._log(TRACE_LEVEL, msg, args, **kwargs)
+            self._log(TRACE_LEVEL, msg, args)
 
 
 logging.setLoggerClass(TitanLogger)

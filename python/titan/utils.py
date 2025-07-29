@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Type, TypeVar, Union
 
 
 class _MetaDummyClass(type):
@@ -41,3 +41,4 @@ def dummy_decorator(fn: Callable) -> Callable:
         return fn(*args, **kwargs)
 
     return wrapper
+

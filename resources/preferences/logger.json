@@ -1,0 +1,140 @@
+{
+  "component_type": "Settings",
+  "name": "settings",
+  "scope": "QtCore.QSettings.UserScope",
+  "application": "titan.logger",
+  "organization": "titan",
+  "children": [
+    {
+      "component_type": "Group",
+      "name": "win",
+      "label": "Window",
+      "visible": false,
+      "children": [
+        {
+          "component_type": "Compound",
+          "label": "Size",
+          "children": [
+            {
+              "component_type": "Field",
+              "type": "int",
+              "name": "width",
+              "default": 800
+            },
+            {
+              "component_type": "Field",
+              "type": "int",
+              "name": "height",
+              "default": 600
+            }
+          ]
+        },
+        {
+          "component_type": "Compound",
+          "name": "pos",
+          "label": "Position",
+          "children": [
+            {
+              "component_type": "Field",
+              "type": "int",
+              "name": "x",
+              "default": null
+            },
+            {
+              "component_type": "Field",
+              "type": "int",
+              "name": "y",
+              "default": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component_type": "Group",
+      "label": "General",
+      "children": [
+        {
+          "component_type": "ComboBox",
+          "name": "level",
+          "label": "Log Level",
+          "default": "Any",
+          "type": "str",
+          "children": [
+            {
+              "component_type": "Item",
+              "name": "Any"
+            },
+            {
+              "component_type": "Item",
+              "name": "Trace"
+            },
+            {
+              "component_type": "Item",
+              "name": "Debug"
+            },
+            {
+              "component_type": "Item",
+              "name": "Info"
+            },
+            {
+              "component_type": "Item",
+              "name": "Warning"
+            },
+            {
+              "component_type": "Item",
+              "name": "Error"
+            },
+            {
+              "component_type": "Item",
+              "name": "Critical"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "component_type": "Group",
+      "label": "Logger Colors",
+      "name": "colors",
+      "children": [
+        {
+          "component_type": "ColorPicker",
+          "label": "Trace",
+          "name": "trace",
+          "default": "186,85,211"
+        },
+        {
+          "component_type": "ColorPicker",
+          "label": "Debug",
+          "name": "debug",
+          "default": "211,211,211"
+        },
+        {
+          "component_type": "ColorPicker",
+          "label": "Info",
+          "name": "info",
+          "default": "248,248,255"
+        },
+        {
+          "component_type": "ColorPicker",
+          "label": "Warning",
+          "name": "warning",
+          "default": "255,165,0"
+        },
+        {
+          "component_type": "ColorPicker",
+          "label": "Error",
+          "name": "error",
+          "default": "255,69,0"
+        },
+        {
+          "component_type": "ColorPicker",
+          "label": "Critical",
+          "name": "critical",
+          "default": "255,0,0"
+        }
+      ]
+    }
+  ]
+}

@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from enum import Enum
-from typing import TYPE_CHECKING, Optional, TypeVar
+from typing import TYPE_CHECKING, Generic, Optional, Type, TypeVar, Union, cast, overload
 
+from titan.types import get_data_type
 from titan.qt import QtCore, QtGui
+
 from .parser import PreferenceNode
 
 if TYPE_CHECKING:
     from .main import Preferences
 
-Number = TypeVar("Number", int, float)
-DataTypes = TypeVar("DataTypes", str, float, int)
+Number = Union[int, float]
+DataTypes = Union[str, float, int, bool]
+T = TypeVar("T")
 
 
 class Group:
@@ -33,10 +37,14 @@ class Group:
         self._name = name
         self._components = {}
 
-    def __getattr__(self, name: str) -> Group:
+    def __getattr__(self, name: str) -> Component:
+        # Check if this is accessing a component that was added
+        if name in self._components:
+            return self._components[name]
+        # Otherwise create a new Group, but type it as Component for PyLance
         obj = Group(name)
         self.__dict__[name] = obj
-        return obj
+        return obj  # type: ignore
 
     def add_component(self, component: Component) -> None:
         """Add a component to the group, ensure the component name is unique.
@@ -51,32 +59,26 @@ class Group:
         self.__dict__[component.name] = component
 
 
-class Component:
+class Component(Generic[T]):
+
+    _TYPE: Optional[Enum] = None
 
     Type = Enum("ComponentType", "Settings Field State Color Combo Radio Slider")
-
-    DataTypes = {
-        "int": int,
-        "str": str,
-        "float": float,
-        "bool": bool,
-        "list": list,
-        "dict": dict,
-    }
 
     def __init__(self, name: str, path: str, label: Optional[str] = None):
         self.name = name
         self.path = path
         self.label = label
-        self.preferences: Preferences = None
+        self.preferences: Preferences
+        self.default: Optional[T] = None
 
     @classmethod
-    def validate(self, node: PreferenceNode) -> bool:
+    def validate(cls, node: PreferenceNode):
         """Validate the preference node contains the required attributes for this
         component and/or create the missing attributes if applicable."""
-        # Label is optional, if it does not exist, we will default to None
+        # Label is optional, if it does not exist, we will default to an empty str
         if not hasattr(node, "label"):
-            node.add_property("label", None)
+            node.add_property("label", "")
 
         if not hasattr(node, "name"):
             raise ValueError(
@@ -87,9 +89,10 @@ class Component:
                 f"{node.node_type} ({node.name}) must have a default attribute."
             )
         if node.default == "null":
-            node.default = None
+            setattr(node, "default", None)
 
     @classmethod
+    @abstractmethod
     def from_preference_node(cls, node: PreferenceNode) -> Component:
         """Create a component from a preference node."""
         cls.validate(node)
@@ -99,23 +102,47 @@ class Component:
         self.preferences = preferences
 
     @property
-    def value(self) -> DataTypes:
+    def value(self) -> Optional[T]:
         """Get the value from the preferences."""
-        value = self.preferences.get_value(self.path)
-        if value is None:
-            value = self.default
-        if value and hasattr(self, "data_type"):
-            return self.data_type(value)
-        return value
+        out = self.preferences.get_value(self.path)
+        if out is None:
+            out = self.default
+        return cast(Optional[T], out)
 
     @value.setter
-    def value(self, value: DataTypes) -> None:
+    def value(self, in_val: DataTypes) -> None:
         """Set the value in the preferences."""
-        self.preferences.set_value(self.path, value)
+        self.preferences.set_value(self.path, in_val)
 
     @property
     def type(self):
         return self._TYPE
+
+
+class TypedComponent(Component):
+
+    def __init__(
+        self, name: str, path: str, data_type: str, label: Optional[str] = None
+    ):
+        super().__init__(name, path, label)
+        self.data_type = cast(Type[DataTypes], get_data_type(data_type))
+
+    @property
+    def value(self) -> Optional[DataTypes]:
+        """Get the value from the preferences."""
+        out = self.preferences.get_value(self.path)
+        if out is None:
+            out = self.default
+        if out is not None:
+            # Handle empty strings for numeric types
+            if isinstance(out, str) and out == "" and self.data_type in (int, float):
+                return None
+            return self.data_type(out)
+
+    @value.setter
+    def value(self, in_val: DataTypes) -> None:
+        """Set the value in the preferences."""
+        self.preferences.set_value(self.path, in_val)
 
 
 class Settings(Component):
@@ -123,7 +150,7 @@ class Settings(Component):
     _TYPE = Component.Type.Settings
 
     def __init__(self, name, scope, application, organization):
-        super().__init__(name, None, None)
+        super().__init__(name, "", None)
         self.scope = self._get_scope(scope)
         self.application = application
         self.organization = organization
@@ -131,10 +158,11 @@ class Settings(Component):
     @staticmethod
     def _get_scope(scope: str) -> QtCore.QSettings.Scope:
         """Get the QSettings scope from a string."""
-        _scope = QtCore
-        for attr in scope.split(".")[1:]:
-            _scope = getattr(_scope, attr)
-        return _scope
+        if "UserScope" in scope:
+            return QtCore.QSettings.Scope.UserScope
+        if "SystemScope" in scope:
+            return QtCore.QSettings.Scope.SystemScope
+        raise AttributeError("Invalid scope")
 
     @classmethod
     def validate(cls, node: PreferenceNode):
@@ -160,18 +188,18 @@ class Settings(Component):
             )
 
     @classmethod
-    def from_preference_node(cls, node: PreferenceNode):
+    def from_preference_node(cls, node: PreferenceNode) -> Settings:
         # default and name properties aren't needed for the Settings component
         # If they're not given, it shouldn't fail.
         if not hasattr(node, "default"):
-            node.add_property("default", None)
+            node.add_property("default", "")
         if not hasattr(node, "name"):
-            node.add_property("name", None)
+            node.add_property("name", "")
         super(Settings, cls).from_preference_node(node)
         return cls(node.name, node.scope, node.application, node.organization)
 
 
-class Field(Component):
+class Field(TypedComponent):
 
     _TYPE = Component.Type.Field
 
@@ -181,12 +209,19 @@ class Field(Component):
         path: str,
         data_type: str,
         default: str,
-        range_: Optional[tuple] = None,
+        range_: Optional[tuple[str, str]] = None,
         label: Optional[str] = None,
     ):
-        super().__init__(name, path, label=label)
-        self.data_type = self.DataTypes.get(data_type)
-        self.default = self.data_type(default) if default else None
+        super().__init__(name, path, data_type, label=label)
+        self.data_type = cast(Type[DataTypes], get_data_type(data_type))
+        if default and default.strip():
+            self.default = self.data_type(default)
+        else:
+            # For numeric types, use None instead of empty string
+            if self.data_type in (int, float):
+                self.default = None
+            else:
+                self.default = ""
         self.range = tuple(self.data_type(i) for i in range_) if range_ else None
 
     @classmethod
@@ -197,7 +232,7 @@ class Field(Component):
 
         # Validate we can convert the default value to the specified data type
         if node.default:
-            data_type = cls.DataTypes.get(node.type)
+            data_type = cast(Type[DataTypes], get_data_type(node.type))
             try:
                 data_type(node.default)
             except ValueError:
@@ -214,13 +249,13 @@ class Field(Component):
             node.name,
             node.get_path(),
             node.type,
-            node.default,
-            range_=range_,
+            cast(str, node.default),
+            range_=cast(tuple[str, str], range_),
             label=node.label,
         )
 
 
-class State(Component):
+class State(Component[bool]):
 
     _TYPE = Component.Type.State
 
@@ -231,18 +266,25 @@ class State(Component):
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
         super(State, cls).from_preference_node(node)
-        return cls(node.name, node.get_path(), node.default, label=node.label)
+        return cls(
+            node.name, node.get_path(), cast(str, node.default), label=node.label
+        )
 
     @property
     def value(self) -> bool:
         """Get the value from the preferences."""
-        value = self.preferences.get_value(self.path)
+        value = cast(bool, self.preferences.get_value(self.path))
         if value is None:
-            value = self.default
+            value = self.default if self.default is not None else False
         return as_bool(value)
 
+    @value.setter
+    def value(self, in_val: DataTypes) -> None:
+        """Set the value in the preferences."""
+        self.preferences.set_value(self.path, in_val)
 
-class Color(Component):
+
+class Color(Component[Union[QtGui.QColor, str]]):
 
     _TYPE = Component.Type.Color
 
@@ -254,21 +296,29 @@ class Color(Component):
     def from_preference_node(cls, node: PreferenceNode):
         super(Color, cls).from_preference_node(node)
         # Add the alpha component if not included
-        default = [comp.strip() for comp in node.default.split(",")]
+        default_val = cast(str, node.default)
+        default = [comp.strip() for comp in default_val.split(",")]
         if len(default) == 3:
             default.append("255")
         return cls(node.name, node.get_path(), ",".join(default), node.label)
 
     @property
-    def value(self) -> QtGui.QColor:
+    def value(self) -> Optional[QtGui.QColor]:
         """Get the color from the preferences."""
         value = self.preferences.get_value(self.path)
         if value is None:
             value = self.default
-        return QtGui.QColor(*[int(comp.strip()) for comp in value.split(",")])
+        return QtGui.QColor(
+            *[int(comp.strip()) for comp in cast(str, value).split(",")]
+        )
+
+    @value.setter
+    def value(self, in_val: DataTypes) -> None:
+        """Set the value in the preferences."""
+        self.preferences.set_value(self.path, in_val)
 
 
-class TypedItemComponent(Component):
+class TypedItemComponent(TypedComponent):
     """A shared base class for components that contain items."""
 
     def __init__(
@@ -280,8 +330,7 @@ class TypedItemComponent(Component):
         default: str,
         label: Optional[str] = None,
     ):
-        super().__init__(name, path, label=label)
-        self.data_type = self.DataTypes.get(data_type)
+        super().__init__(name, path, data_type, label=label)
         self.default = self.data_type(default)
         self._items = []
         for item in items:
@@ -303,18 +352,26 @@ class TypedItemComponent(Component):
             )
 
         # Validate we can convert the default value to the specified data type
-        data_type = cls.DataTypes.get(node.type)
-        try:
-            data_type(node.default)
-        except ValueError:
-            raise ValueError(f"Invalid default value for {cls.__name__} '{node.name}'")
+        data_type = cast(Type[DataTypes], get_data_type(node.type))
+        if node.default:
+            try:
+                data_type(node.default)
+            except ValueError:
+                raise ValueError(
+                    f"Invalid default value for {cls.__name__} '{node.name}'"
+                )
 
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
         super(TypedItemComponent, cls).from_preference_node(node)
         items = [child.name for child in node.children]
         return cls(
-            node.name, node.get_path(), node.type, items, node.default, label=node.label
+            node.name,
+            node.get_path(),
+            node.type,
+            items,
+            cast(str, node.default),
+            label=node.label,
         )
 
 
@@ -330,7 +387,7 @@ class Radio(TypedItemComponent):
     _TYPE = Component.Type.Radio
 
 
-class Slider(Component):
+class Slider(TypedComponent):
     """A slider component."""
 
     _TYPE = Component.Type.Slider
@@ -342,12 +399,11 @@ class Slider(Component):
         data_type: str,
         default: str,
         step: str,
-        range_: tuple[str],
+        range_: tuple[str, str],
         field: str,  # none, left, right
         label: Optional[str] = None,
     ):
-        super().__init__(name, path, label=label)
-        self.data_type = self.DataTypes.get(data_type)
+        super().__init__(name, path, data_type, label=label)
         self.default = self.data_type(default)
         self.step = self.data_type(step)
         self.range = tuple(self.data_type(i) for i in range_)
@@ -364,19 +420,20 @@ class Slider(Component):
     @classmethod
     def from_preference_node(cls, node: PreferenceNode):
         super(Slider, cls).from_preference_node(node)
+        range_ = cast(tuple[str, str], tuple([i for i in node.range.split(" ")]))
         return cls(
             node.name,
             node.get_path(),
             node.type,
-            node.default,
+            cast(str, node.default),
             node.step,
-            tuple([i for i in node.range.split(" ")]),
+            range_,
             node.field,
             label=node.label,
         )
 
 
-def as_bool(value: str) -> bool:
+def as_bool(value: DataTypes) -> bool:
     """Convert a string to a boolean."""
     if not isinstance(value, str):
         return bool(value)

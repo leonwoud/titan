@@ -1,10 +1,12 @@
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from titan.preferences import Preferences
 from titan.qt import QtCore, QtGui, QtWidgets
 
 from .header import Headers, Levels
 from .record import TitanLogRecord
+
+from titan._internal.preferences.protocols import LoggerPreferences
 
 
 class FilterProxyModel(QtCore.QSortFilterProxyModel):
@@ -26,7 +28,9 @@ class FilterProxyModel(QtCore.QSortFilterProxyModel):
 
         self.invalidateFilter()
 
-    def filterAcceptsRow(self, row: int, parent: QtCore.QModelIndex) -> bool:
+    def filterAcceptsRow(
+        self, row: int, parent: QtCore.QModelIndex | QtCore.QPersistentModelIndex
+    ) -> bool:
         """Determines if the row should be accepted based on the filters."""
         if not self._filters:
             return True
@@ -35,7 +39,7 @@ class FilterProxyModel(QtCore.QSortFilterProxyModel):
         # Sort out the level filter first
         if Headers.Level in self._filters:
             index = source_model.index(row, Headers.Level, parent)
-            level = source_model.data(index, QtCore.Qt.DisplayRole)
+            level = source_model.data(index, QtCore.Qt.ItemDataRole.DisplayRole)
             if level not in self._filters[Headers.Level]:
                 return False
 
@@ -43,7 +47,7 @@ class FilterProxyModel(QtCore.QSortFilterProxyModel):
         for col in [col for col in Headers if col != Headers.Level]:
             if col in self._filters:
                 index = source_model.index(row, col, parent)
-                value = source_model.data(index, QtCore.Qt.DisplayRole)
+                value = source_model.data(index, QtCore.Qt.ItemDataRole.DisplayRole)
                 matched = [f for f in self._filters[col] if f.lower() in value.lower()]
                 if not matched:
                     return False
@@ -59,20 +63,34 @@ class TitanLoggerModel(QtCore.QAbstractTableModel):
         self._log_records = []
         self._prefs = preferences
 
-    def rowCount(self, parent: QtCore.QModelIndex) -> int:
+    def rowCount(
+        self,
+        parent: (
+            QtCore.QModelIndex | QtCore.QPersistentModelIndex
+        ) = QtCore.QModelIndex(),
+    ) -> int:
         """Return the number of rows in the model."""
         return len(self._log_records)
 
-    def columnCount(self, parent: QtCore.QModelIndex) -> int:
+    def columnCount(
+        self,
+        parent: (
+            QtCore.QModelIndex | QtCore.QPersistentModelIndex
+        ) = QtCore.QModelIndex(),
+    ) -> int:
         """Return the number of columns in the model."""
         return len(Headers)
 
-    def data(self, index: QtCore.QModelIndex, role: int) -> Any:
+    def data(
+        self,
+        index: QtCore.QModelIndex | QtCore.QPersistentModelIndex,
+        role: int = QtCore.Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         """Return the data for the given index and role."""
         log_record = self._log_records[index.row()]
         level = log_record.level_name
 
-        if role == QtCore.Qt.DisplayRole:
+        if role == QtCore.Qt.ItemDataRole.DisplayRole:
             if index.column() == Headers.Time:
                 return log_record.time_str
             elif index.column() == Headers.Level:
@@ -82,35 +100,41 @@ class TitanLoggerModel(QtCore.QAbstractTableModel):
             elif index.column() == Headers.Message:
                 return log_record.msg
 
-        elif role == QtCore.Qt.FontRole:
+        elif role == QtCore.Qt.ItemDataRole.FontRole:
             font = QtGui.QFont("Courier New")
             if level == Levels.Critical.level_name:
                 font.setBold(True)
             return font
 
-        elif role == QtCore.Qt.TextAlignmentRole:
+        elif role == QtCore.Qt.ItemDataRole.TextAlignmentRole:
             if index.column() == Headers.Level:
-                return QtCore.Qt.AlignCenter
+                return QtCore.Qt.AlignmentFlag.AlignCenter
 
-        elif role == QtCore.Qt.ForegroundRole:
+        elif role == QtCore.Qt.ItemDataRole.ForegroundRole:
             if level == Levels.Critical.level_name:
-                return self._prefs.colors.critical.value
+                return cast(LoggerPreferences, self._prefs).colors.critical.value
             elif level == Levels.Error.level_name:
-                return self._prefs.colors.error.value
+                return cast(LoggerPreferences, self._prefs).colors.error.value
             elif level == Levels.Warning.level_name:
-                return self._prefs.colors.warning.value
+                return cast(LoggerPreferences, self._prefs).colors.warning.value
             elif level == Levels.Info.level_name:
-                return self._prefs.colors.info.value
+                return cast(LoggerPreferences, self._prefs).colors.info.value
             elif level == Levels.Debug.level_name:
-                return self._prefs.colors.info.value
+                return cast(LoggerPreferences, self._prefs).colors.info.value
             elif level == Levels.Trace.level_name:
-                return self._prefs.colors.trace.value
+                return cast(LoggerPreferences, self._prefs).colors.trace.value
 
     def headerData(
-        self, section: int, orientation: QtCore.Qt.Orientation, role: int
-    ) -> None:
+        self,
+        section: int,
+        orientation: QtCore.Qt.Orientation,
+        role: int = QtCore.Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
         """Return the header data for the given section, orientation, and role."""
-        if role == QtCore.Qt.DisplayRole and orientation == QtCore.Qt.Horizontal:
+        if (
+            role == QtCore.Qt.ItemDataRole.DisplayRole
+            and orientation == QtCore.Qt.Orientation.Horizontal
+        ):
             return Headers(section).label
 
     def add_log_record(self, record: TitanLogRecord) -> None:

@@ -3,18 +3,10 @@ from typing import Optional
 from titan.qt import QtCore, QtWidgets
 
 
-class HeaderFilter(QtCore.QObject):
-    """Base class for filters"""
+class TextFilter(QtWidgets.QLineEdit):
+    """A filter that allows the user to type in a string to filter the model."""
 
     filter_changed = QtCore.Signal(str)
-
-    def reset_filter(self) -> None:
-        """Abstract method called when subclassed filters should be reset."""
-        raise NotImplementedError()
-
-
-class TextFilter(QtWidgets.QLineEdit, HeaderFilter):
-    """A filter that allows the user to type in a string to filter the model."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super(TextFilter, self).__init__(parent=parent)
@@ -27,8 +19,10 @@ class TextFilter(QtWidgets.QLineEdit, HeaderFilter):
         self.clear()
 
 
-class DropDownFilter(QtWidgets.QComboBox, HeaderFilter):
+class DropDownFilter(QtWidgets.QComboBox):
     """A filter that allows the user to select a value from a drop down to filter the model."""
+
+    filter_changed = QtCore.Signal(str)
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super(DropDownFilter, self).__init__(parent=parent)

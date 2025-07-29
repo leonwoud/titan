@@ -28,9 +28,9 @@ class ColorPicker(QtWidgets.QPushButton):
 
     @QtCore.Slot()
     def _on_click(self):
-        kwargs = {"parent": self}
+        kwargs = {}
         if self._accepts_alpha:
-            kwargs["options"] = QtWidgets.QColorDialog.ShowAlphaChannel
+            kwargs["options"] = QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel
         color = QtWidgets.QColorDialog.getColor(self._color, **kwargs)
         if color.isValid():
             self.set_color(color)
@@ -70,14 +70,14 @@ class ColorPicker(QtWidgets.QPushButton):
         """Overriden function."""
         super(ColorPicker, self).paintEvent(event)
         painter = QtGui.QPainter(self)
-        # painter.setRenderHint(QtGui.QPainter.Antialiasing, True)  TODO: Crashes in Qt6
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
         height = self.rect().height()
         width = self.rect().width()
         top = QtCore.QPoint(width, height - 5)
         bottom_right = QtCore.QPoint(width, height)
         bottom_left = QtCore.QPoint(width - 5, +height)
         triangle = QtGui.QPolygon((top, bottom_right, bottom_left))
-        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255, 255), QtCore.Qt.SolidPattern)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255, 255), QtCore.Qt.BrushStyle.SolidPattern)
         painter.setBrush(brush)
         painter.drawPolygon(triangle)
         painter.end()

@@ -26,7 +26,18 @@ import atexit
 import os
 import sys
 import types
-from typing import Optional
+from typing import Any, Optional, TYPE_CHECKING, cast
+
+from .stubs import (
+    MayaCmdsProtocol,
+    MayaMelProtocol,
+    MayaOpenMayaV1Protocol,
+    MayaOpenMayaProtocol,
+    MayaOpenMayaProtocolExtended,
+    MayaOpenMayaAnimProtocol,
+    MayaOpenMayaRenderProtocol,
+    MayaOpenMayaUIProtocol,
+)
 
 # Local imports
 from titan.qt import QtWidgets
@@ -49,49 +60,49 @@ class _MayaAPI:
         self._openmayaui: Optional[types.ModuleType] = None
 
     @property
-    def openmaya_v1(self) -> types.ModuleType:
+    def openmaya_v1(self) -> MayaOpenMayaV1Protocol:
         """Return the Maya OpenMaya (V1) module."""
         if not self._openmaya_v1:
-            import maya.OpenMaya as openmaya
+            import maya.OpenMaya as openmaya  # type: ignore
 
             self._openmaya_v1 = openmaya
-        return self._openmaya_v1
+        return cast(MayaOpenMayaV1Protocol, self._openmaya_v1)
 
     @property
-    def openmaya(self) -> types.ModuleType:
+    def openmaya(self) -> MayaOpenMayaProtocolExtended:
         """Return the Maya OpenMaya module."""
         if not self._openmaya:
-            import maya.api.OpenMaya as openmaya
+            import maya.api.OpenMaya as openmaya  # type: ignore
 
             self._openmaya = openmaya
-        return self._openmaya
+        return cast(MayaOpenMayaProtocolExtended, self._openmaya)
 
     @property
-    def openmayaanim(self) -> types.ModuleType:
+    def openmayaanim(self) -> MayaOpenMayaAnimProtocol:
         """Return the Maya OpenMayaAnim module."""
         if not self._openmayaanim:
-            import maya.OpenMayaAnim as openmayaanim
+            import maya.OpenMayaAnim as openmayaanim  # type: ignore
 
             self._openmayaanim = openmayaanim
-        return self._openmayaanim
+        return cast(MayaOpenMayaAnimProtocol, self._openmayaanim)
 
     @property
-    def openmayarender(self) -> types.ModuleType:
+    def openmayarender(self) -> MayaOpenMayaRenderProtocol:
         """Return the Maya OpenMayaRender module."""
         if not self._openmayarender:
-            import maya.OpenMayaRender as openmayarender
+            import maya.OpenMayaRender as openmayarender  # type: ignore
 
             self._openmayarender = openmayarender
-        return self._openmayarender
+        return cast(MayaOpenMayaRenderProtocol, self._openmayarender)
 
     @property
-    def openmayaui(self) -> types.ModuleType:
+    def openmayaui(self) -> MayaOpenMayaUIProtocol:
         """Return the Maya OpenMayaUI module."""
         if not self._openmayaui:
-            import maya.OpenMayaUI as openmayaui
+            import maya.OpenMayaUI as openmayaui  # type: ignore
 
             self._openmayaui = openmayaui
-        return self._openmayaui
+        return cast(MayaOpenMayaUIProtocol, self._openmayaui)
 
 
 class _MayaUI:
@@ -106,30 +117,33 @@ class _MayaUI:
         self._is_available: Optional[bool] = None
 
     @property
-    def mqtutil(self) -> types.ModuleType:
+    def mqtutil(self) -> Any:
         """Return the Maya Qt utility module (maya.OpenMayaUI.MQtUtil)"""
         if not self._mqtutil:
-            from maya.OpenMayaUI import MQtUtil
+            from maya.OpenMayaUI import MQtUtil  # type: ignore
 
             self._mqtutil = MQtUtil
-        return self._mqtutil
+        return cast(Any, self._mqtutil)
 
     @property
-    def main_window(self) -> QtWidgets.QMainWindow:
+    def main_window(self) -> Optional[QtWidgets.QMainWindow]:
         """Return the Maya main window as a QMainWindow."""
         if not self._window:
             from titan.qt import QtWidgets, wrap_instance
 
             ptr = self.mqtutil.mainWindow()
             if ptr is not None:
-                self._window = wrap_instance(int(ptr), QtWidgets.QMainWindow)
+                self._window = cast(
+                    QtWidgets.QMainWindow,
+                    wrap_instance(int(ptr), QtWidgets.QMainWindow),
+                )
         return self._window
 
     @property
     def is_available(self) -> bool:
         """Return True if Maya UI is available."""
-        if not self._is_available:
-            import titan.host.maya as Maya
+        if self._is_available is None:
+            from titan.host.maya import Maya
 
             if Maya.is_available:
                 self._is_available = not Maya.cmds.about(batch=True)
@@ -152,9 +166,9 @@ class _MayaUI:
         """
         from titan.qt import wrap_instance
 
-        ptr = cls.mqtutil.findWindow(window_name)
-        if ptr:
-            return wrap_instance(int(ptr), object_type)
+        ptr = cast(Any, cls.mqtutil).findWindow(window_name)
+        if ptr is not None:
+            return cast(Any, wrap_instance(int(ptr), object_type))
 
     @classmethod
     def find_control(
@@ -171,9 +185,9 @@ class _MayaUI:
         """
         from titan.qt import wrap_instance
 
-        ptr = cls.mqtutil.findControl(control_name)
-        if ptr:
-            return wrap_instance(int(ptr), object_type)
+        ptr = cast(Any, cls.mqtutil).findControl(control_name)
+        if ptr is not None:
+            return cast(Any, wrap_instance(int(ptr), object_type))
 
 
 class _MayaCore(type):
@@ -184,33 +198,35 @@ class _MayaCore(type):
         self._mel: Optional[types.ModuleType] = None
         self._ui: Optional[_MayaUI] = None
         self._api: Optional[_MayaAPI] = None
-        self._events: MayaEvent = MayaEvent
+        self._events = MayaEvent
         self._event_manager: Optional[EventCallbackManager] = None
         self._is_standalone: Optional[bool] = None
         self._is_available: Optional[bool] = None
         atexit.register(self._cleanup)
 
     @property
-    def cmds(self) -> types.ModuleType:
+    def cmds(self) -> MayaCmdsProtocol:
         """Return the Maya commands module."""
         if self._cmds is None:
             try:
-                import maya.cmds as cmds
+                import maya.cmds as cmds # type: ignore
+
+                self._cmds = cmds
             except ImportError:
-                cmds = None
-            self._cmds = cmds
-        return self._cmds
+                raise ImportError("Maya cmds module not available")
+        return cast(MayaCmdsProtocol, self._cmds)
 
     @property
-    def mel(self) -> types.ModuleType:
+    def mel(self) -> MayaMelProtocol:
         """Return the Maya MEL module."""
         if self._mel is None:
             try:
-                import maya.mel as mel
+                import maya.mel as mel # type: ignore
+
+                self._mel = mel
             except ImportError:
-                mel = None
-            self._mel = mel
-        return self._mel
+                raise ImportError("Maya mel module not available")
+        return cast(MayaMelProtocol, self._mel)
 
     @property
     def api(self) -> _MayaAPI:
@@ -230,7 +246,7 @@ class _MayaCore(type):
     def is_standalone(self) -> bool:
         """Return True if Maya is running in mayapy."""
         if self._is_standalone is None:
-            self._is_standalone = "mayapy" in os.path.basename(sys.executable)
+            self._is_standalone = "mayapy" in os.path.basename(sys.executable).lower()
         return self._is_standalone
 
     @property
@@ -251,7 +267,7 @@ class _MayaCore(type):
         if self._is_available is None:
             if self.is_standalone:
                 self._is_available = True
-            elif "Maya" in os.path.basename(sys.executable):
+            elif "maya" in os.path.basename(sys.executable).lower():
                 self._is_available = True
             else:
                 self._is_available = False
@@ -260,7 +276,7 @@ class _MayaCore(type):
     @property
     def events(self) -> MayaEvent:
         """Return the MayaEvent enum."""
-        return self._events
+        return cast(MayaEvent, self._events)
 
     @property
     def event_manager(self) -> EventCallbackManager:
@@ -279,7 +295,7 @@ class _MayaCore(type):
             raise RuntimeError("Maya is not available")
 
         if self.is_standalone and not self.is_initialized:
-            import maya.standalone
+            import maya.standalone # type: ignore
 
             maya.standalone.initialize()
             self._is_standalone = True
@@ -296,7 +312,7 @@ class _MayaCore(type):
         self._event_manager = None
 
         if self.is_standalone and self.is_initialized:
-            import maya.standalone
+            import maya.standalone # type: ignore
 
             maya.standalone.uninitialize()
             LOGGER.info("Maya standalone uninitialized")

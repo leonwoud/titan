@@ -1,16 +1,29 @@
 from __future__ import annotations
 
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, Optional, Union, cast, TYPE_CHECKING, Protocol
 
-from titan.qt import QtCore, QtWidgets
+from titan.qt import QtCore, QtGui, QtWidgets
 from titan.widgets import CollapsibleContainer
+
 
 from titan._internal.preferences.components import (
     Component,
     Group,
+    Settings,
     as_bool,
     from_preference_node,
 )
+
+if TYPE_CHECKING:
+    # Protocol for widgets that can be used in PreferenceLabel
+    class PreferenceWidgetProtocol(Protocol):
+        def get_value(self) -> Any: ...
+        def set_value(self, value: Any, read_only: bool = False) -> None: ...
+        @property
+        def default(self) -> Any: ...
+        # value_changed: QtCore.Signal  TODO: Doesn't work, not sure why
+
+
 from titan._internal.preferences.parser import (
     PreferenceNode,
     load_preferences_from_file,
@@ -25,10 +38,10 @@ from titan._internal.preferences.widgets import (
     Slider,
 )
 
-# TypeVar for the return type of from_component
-PreferenceComponent = TypeVar(
-    "PreferenceComponent", CheckBox, ColorPicker, ComboBox, Field, RadioButtons, Slider
-)
+
+PreferenceComponent = Union[
+    CheckBox, ColorPicker, ComboBox, Field, RadioButtons, Slider
+]
 
 
 class AmbiguousPreferenceError(Exception):
@@ -40,6 +53,14 @@ class Preferences(QtCore.QSettings):
 
     preference_updated = QtCore.Signal(str, object)
 
+    def __getattr__(self, name: str) -> Component:
+        """Provide typing support for dynamically added components."""
+        # This is only called when the attribute doesn't exist normally
+        # The actual attributes are set by _add_component()
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{name}'"
+        )
+
     def __init__(
         self,
         name: str,
@@ -49,27 +70,23 @@ class Preferences(QtCore.QSettings):
     ):
         super().__init__(scope, organization, application)
         self.name = name
-        self.scope = scope
-        self.application = application
-        self.organization = organization
         self._components = {}
-        self._file_path = None
+        self._file_path: str
 
     @classmethod
     def from_file(
         cls, file_path: str, application: Optional[str] = None
     ) -> Preferences:
-        """Create preferences from a file.
+        """Create preferences from a JSON file.
 
         Args:
-            file_path: The path to the preferences file.
+            file_path: The path to the JSON preferences file.
             application: The application name to use for the preferences. This
-                is useful if the same base preferences are used by multiple applications
-                but still
+                is useful if the same base preferences are used by multiple applications.
         """
         preference_tree = load_preferences_from_file(file_path)
         components = get_components(preference_tree)
-        settings = components[0]
+        settings = cast(Settings, components[0])
         inst = cls(
             settings.name,
             settings.scope,
@@ -158,7 +175,12 @@ def get_components(preference_node: PreferenceNode) -> list[Component]:
     """Returns the preference components."""
     components = []
     for child in preference_node.children:
-        if child.children:
+        # Special handling for Settings component - always include it first
+        if child.node_type == "Settings":
+            components.insert(0, from_preference_node(child))
+            # Then process its children
+            components.extend(get_components(child))
+        elif child.children:
             # Check if the children are only of type 'Item' if so, we
             # stop the search here
             if all(child.node_type == "Item" for child in child.children):
@@ -200,19 +222,21 @@ class PreferenceLabel(QtWidgets.QPushButton):
     def __init__(
         self,
         label_text: str,
-        widget: PreferenceComponent,
+        widget: PreferenceWidgetProtocol,
         parent: Optional[QtWidgets.QWidget] = None,
     ):
         super().__init__(parent=parent)
         self._label = QtWidgets.QLabel(label_text)
-        self._label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        self._label.setAlignment(
+            QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter
+        )
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._label)
         self.setFixedSize(100, 20)
         self.setFlat(True)
         self._widget = widget
-        self._current_value = None
+        self._current_value: Optional[Any] = None
         self.clicked.connect(self._on_clicked)
 
     @QtCore.Slot(object)
@@ -222,7 +246,7 @@ class PreferenceLabel(QtWidgets.QPushButton):
     @QtCore.Slot()
     def _on_clicked(self) -> None:
         value = self._widget.get_value()
-        if value != self._widget.default:
+        if value != self._widget.default and self._widget.default is not None:
             self._widget.set_value(self._widget.default)
             self.update_font(self._widget.default)
             self._current_value = value
@@ -242,11 +266,11 @@ class PreferenceFormLayout(QtWidgets.QFormLayout):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
-    def add_row(self, label: str, widget: PreferenceComponent) -> None:
-        label = PreferenceLabel(label, widget)
-        label.update_font(widget.get_value())
-        widget.value_changed.connect(label.on_value_changed)
-        super().addRow(label, widget)
+    def add_row(self, label: str, widget: PreferenceWidgetProtocol) -> None:
+        label_widget = PreferenceLabel(label, widget)
+        label_widget.update_font(widget.get_value())
+        cast(Any, widget).value_changed.connect(label_widget.on_value_changed)
+        super().addRow(label, cast(QtWidgets.QWidget, widget))
 
     def add_widget(self, widget: QtWidgets.QWidget) -> None:
         super().addRow(widget)
@@ -278,21 +302,23 @@ class PreferenceGroup(QtWidgets.QWidget):
             component: The component to add.
         """
         widget = from_component(component)
-        label = "" if component.type == component.Type.State else component.label
-        widget.value_changed.connect(self.refresh_requested)
+        label = "" if component.type == component.Type.State else component.label or ""
+        cast(Any, widget).value_changed.connect(self.refresh_requested)
         self.add_row(label, widget)
 
-    def add_row(self, label: str, widget: QtWidgets.QWidget) -> None:
+    def add_row(self, label: str, widget: PreferenceWidgetProtocol) -> None:
         """Add a row to the group.
 
         Args:
             label: The label for the widget.
             widget: The widget to add.
         """
-        widget.value_changed.connect(self.refresh_requested)
+        cast(Any, widget).value_changed.connect(self.refresh_requested)
         self._form_layout.add_row(label, widget)
 
-    def add_widget(self, widget: QtWidgets.QWidget) -> None:
+    def add_widget(
+        self, widget: Union[PreferenceWidget, PreferenceGroup, Tabs]
+    ) -> None:
         """Add a widget to the group.
 
         Args:
@@ -371,7 +397,8 @@ def create_group(node: PreferenceNode, preferences: Preferences) -> PreferenceGr
 
         else:
             component = preferences.get_component(child.get_path())
-            grp.add_component(component)
+            if component:
+                grp.add_component(component)
 
     return grp
 
@@ -429,12 +456,13 @@ def create_preferences_widget(
 
         else:
             child_comp = preferences.get_component(child.get_path())
-            child_widget = from_component(child_comp)
-            # We make the label a blank string for State components, as the label is
-            # already displayed on the checkbox itself.
-            label = "" if child_comp.type == child_comp.Type.State else child_comp.label
-            child_widget.value_changed.connect(widget.refresh_requested)
-            form_layout.add_row(label, child_widget)
+            if child_comp:
+                child_widget = from_component(child_comp)
+                # We make the label a blank string for State components, as the label is
+                # already displayed on the checkbox itself.
+                label = "" if child_comp.type == child_comp.Type.State else child_comp.label or ""
+                child_widget.value_changed.connect(widget.refresh_requested)
+                form_layout.add_row(label, child_widget)
 
     layout.addStretch()
     return widget
@@ -459,14 +487,14 @@ class Compound(QtWidgets.QWidget):
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
-        layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        self._layout = QtWidgets.QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
         self._widgets = []
 
-    def add_widget(self, widget: QtWidgets.QWidget):
+    def add_widget(self, widget: PreferenceComponent):
         self._widgets.append(widget)
         widget.value_changed.connect(self._on_value_changed)
-        self.layout().addWidget(widget)
+        self._layout.addWidget(cast(QtWidgets.QWidget, widget))
 
     @QtCore.Slot()
     def _on_value_changed(self):
@@ -499,10 +527,15 @@ class PreferencesDialog(QtWidgets.QDialog):
     refresh_requested = QtCore.Signal()
 
     def __init__(
-        self, preferences: Preferences, parent: Optional[QtWidgets.QWidget] = None
+        self,
+        preferences: Preferences,
+        window_title: Optional[str] = None,
+        parent: Optional[QtWidgets.QWidget] = None,
     ):
         super().__init__(parent=parent)
         self._preferences = preferences
+        window_title = window_title or "Preferences"
+        self.setWindowTitle(window_title)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._preferences_widget = create_preferences_widget(preferences)
@@ -513,20 +546,22 @@ class PreferencesDialog(QtWidgets.QDialog):
 
     def restore_defaults(self) -> None:
         """Restore all preferences to their default values."""
-        for child in self._preferences_widget.findChildren(PreferenceBase):
-            child.restore_default()
+        for child in self._preferences_widget.findChildren(QtWidgets.QWidget):
+            if hasattr(child, 'restore_default') and callable(getattr(child, 'restore_default')):
+                cast(Any, child).restore_default()
 
     @QtCore.Slot()
     def reload(self) -> None:
         """Reload the preferences from the preferences file."""
-        for child in self._preferences_widget.findChildren(PreferenceBase):
-            child.reload()
+        for child in self._preferences_widget.findChildren(QtWidgets.QWidget):
+            if hasattr(child, 'reload') and callable(getattr(child, 'reload')):
+                cast(Any, child).reload()
 
-    def showEvent(self, event: QtWidgets.QShowEvent) -> None:
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
         self._watcher.addPath(self._preferences.fileName())
         self.reload()
         event.accept()
 
-    def closeEvent(self, event: QtWidgets.QCloseEvent) -> None:
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._watcher.removePath(self._preferences.fileName())
         event.accept()

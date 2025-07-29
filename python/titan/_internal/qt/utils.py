@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Optional, TYPE_CHECKING
 
-from titan.qt import QtCore, QtGui, QtWidgets
+from titan.qt import QtCore, QtGui, QtWidgets, QT_VERSION
 
-if TYPE_CHECKING:
-    from titan.preferences import Preferences
+from titan.preferences import Preferences
+from titan._internal.preferences.protocols import WindowPreferences
 
 
-def _validate_preferences(preferences: Preferences) -> bool:
+def _validate_preferences(preferences: WindowPreferences) -> bool:
     """Validate that the preferences contain the expected keys.
 
     Args:
@@ -34,7 +34,7 @@ def _validate_preferences(preferences: Preferences) -> bool:
 
 
 def restore_window_size_and_position(
-    widget: QtWidgets.QWidget, preferences: Preferences
+    widget: QtWidgets.QWidget, preferences: WindowPreferences
 ) -> None:
     """Restore the window size and position from the preferences. If the position is not set, center the window.
 
@@ -48,15 +48,18 @@ def restore_window_size_and_position(
     y_pos = preferences.win.pos.y.value
     # Will only be None the first time the window is shown, after that the
     # position will be stored in the preferences
+    if QT_VERSION > 600000:
+        desktop_geometry = QtWidgets.QApplication.primaryScreen().geometry() # type: ignore
+    else:
+        desktop_geometry = QtWidgets.QApplication.desktop().screenGeometry() # type: ignore
     if x_pos is None:
-        desktop_geometry = QtWidgets.QApplication.desktop().screenGeometry()
         x_pos = (desktop_geometry.width() - widget.width()) // 2
         y_pos = (desktop_geometry.height() - widget.height()) // 2
     widget.move(x_pos, y_pos)
 
 
 def store_window_size_and_position(
-    widget: QtWidgets.QWidget, preferences: Preferences
+    widget: QtWidgets.QWidget, preferences: WindowPreferences
 ) -> None:
     """Save the window size and position to the preferences.
 

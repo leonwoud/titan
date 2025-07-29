@@ -3,8 +3,10 @@ from __future__ import annotations
 from enum import Enum
 import inspect
 import types
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, TYPE_CHECKING, Union, cast
 import weakref
+
+from .stubs import MayaOpenMayaProtocolExtended
 
 # Local imports
 from titan.logger import get_logger
@@ -88,42 +90,65 @@ class MayaEventManager(QtCore.QObject):
     _INSTANCE = None
     _CALLBACKS = {}
 
-    # Ensurue these signals are available as class attributes
+    # Ensure these signals are available as class attributes
     # before the class is instantiated and super is called or
     # the signals will not be available.
-    for event in _EVENT_MAP:
-        locals()[event.name] = QtCore.Signal(object)
+    # Note: Dynamic signal creation - PyLance can't type-check this,
+    # but signals will be available as attributes at runtime
+    for maya_event in _EVENT_MAP:
+        locals()[maya_event.name] = QtCore.Signal(object)  # type: ignore
 
     def __init__(self):
         super().__init__()
         from titan.host.maya import OpenMaya  # Avoid cyclic import
 
+        # Check if Maya is available
+        if OpenMaya is None:
+            raise RuntimeError(
+                "Maya OpenMaya module is not available. "
+                "MayaEventManager can only be used within a Maya environment."
+            )
+
+        # Cast OpenMaya to our extended protocol for better typing
+        openmaya = cast(MayaOpenMayaProtocolExtended, OpenMaya)
+
         # Connect the signals to the Maya events
-        for event, data in _EVENT_MAP.items():
+        for maya_event, data in _EVENT_MAP.items():
             maya_event_name, event_type = data
 
             if event_type == EventType.SceneEvent:
-                maya_event = getattr(OpenMaya.MSceneMessage, maya_event_name)
-                self._CALLBACKS[event.name] = OpenMaya.MSceneMessage.addCallback(
-                    maya_event, getattr(self, event.name).emit
+                maya_event_constant = getattr(openmaya.MSceneMessage, maya_event_name)
+                signal_emit = cast(
+                    Callable[..., Any], getattr(self, maya_event.name).emit
+                )
+                self._CALLBACKS[maya_event.name] = openmaya.MSceneMessage.addCallback(
+                    maya_event_constant, signal_emit
                 )
 
             elif event_type == EventType.ActionEvent:
-                self._CALLBACKS[event.name] = OpenMaya.MEventMessage.addEventCallback(
-                    maya_event_name, getattr(self, event.name).emit
+                signal_emit = cast(
+                    Callable[..., Any], getattr(self, maya_event.name).emit
+                )
+                self._CALLBACKS[maya_event.name] = (
+                    openmaya.MEventMessage.addEventCallback(
+                        maya_event_name, signal_emit
+                    )
                 )
 
     @classmethod
-    def instance(cls: MayaEventManager) -> MayaEventManager:
+    def instance(cls) -> MayaEventManager:
         """Return the instance of the EventManager class."""
         if not cls._INSTANCE:
-            cls._INSTANCE = cls()
+            try:
+                cls._INSTANCE = cls()
+            except RuntimeError as e:
+                raise RuntimeError(f"Cannot create MayaEventManager: {e}")
         return cls._INSTANCE
 
     @classmethod
-    def get_event_signal(cls, event: MayaEvent) -> QtCore.Signal:
+    def get_event_signal(cls, event: MayaEvent) -> QtCore.SignalInstance:
         """Return the signal for the given event."""
-        return getattr(cls.instance(), event.name)
+        return cast(QtCore.SignalInstance, getattr(cls.instance(), event.name))
 
 
 class EventCallback(QtCore.QObject):
@@ -145,8 +170,8 @@ class EventCallback(QtCore.QObject):
     def __init__(
         self,
         event: MayaEvent,
-        callback: Callable,
-        caller_info: inspect.Traceback,
+        callback: Callable[..., Any],
+        caller_info: Optional[Union[inspect.FrameInfo, inspect.Traceback]],
         client_data: Any,
     ):
         super().__init__()
@@ -164,13 +189,15 @@ class EventCallback(QtCore.QObject):
         self._client_data = client_data
 
     def __call__(self, *args, **kwargs):
-        if self.callback and self.is_enabled:
-            if self._client_data is not None:
-                return self.callback()(self._client_data)
-            return self.callback()()
+        if self.callback is not None and self.is_enabled:
+            dereferenced_cb = self.callback()
+            if dereferenced_cb is not None:
+                if self._client_data is not None:
+                    return dereferenced_cb(self._client_data)
+                return dereferenced_cb()
 
     @QtCore.Slot()
-    def on_callback_deleted(self, _: weakref.proxy) -> None:
+    def on_callback_deleted(self, _: weakref.ref) -> None:
         """A slot that is called when the callback is deleted. This will emit the
         callback_deleted signal."""
         self._callback = None
@@ -186,13 +213,13 @@ class EventCallback(QtCore.QObject):
         return self._enabled_state
 
     @property
-    def callback(self) -> Callable:
+    def callback(self) -> Optional[Union[weakref.ref, weakref.WeakMethod]]:
         """Return the callback function."""
         return self._callback
 
     @property
-    def event(self) -> MayaEvent:
-        """Return the event that the callback is connected to."""
+    def maya_event(self) -> MayaEvent:
+        """Return the Maya event that the callback is connected to."""
         return self._event
 
     @property
@@ -218,15 +245,18 @@ class EventCallbackManager:
         super().__init__()
 
     @classmethod
-    def instance(cls: EventCallbackManager) -> EventCallbackManager:
+    def instance(cls) -> EventCallbackManager:
         """Return the instance of the EventCallbackManager class."""
         if not cls._INSTANCE:
             cls._INSTANCE = cls()
         return cls._INSTANCE
 
     def register_callback(
-        self, event: MayaEvent, callback: Callable, client_data: Optional[Any] = None
-    ) -> int:
+        self,
+        event: MayaEvent,
+        callback: Callable[..., Any],
+        client_data: Optional[Any] = None,
+    ) -> str:
         """Create a new event callback for the given event and callback function.
 
         Args:
@@ -235,10 +265,13 @@ class EventCallbackManager:
             client_data (Any): The client data to pass to the callback function.
 
         Returns:
-            int: The ID of the callback.
+            str: The ID of the callback.
         """
-        previous_frame = inspect.currentframe().f_back
-        caller_info = inspect.getframeinfo(previous_frame)
+        current_frame = inspect.currentframe()
+        caller_info = None
+        if current_frame:
+            previous_frame = cast(types.FrameType, current_frame.f_back)
+            caller_info = inspect.getframeinfo(previous_frame)
         event_callback = EventCallback(event, callback, caller_info, client_data)
         event_callback.callback_deleted.connect(self.remove_callback)
         signal = MayaEventManager.get_event_signal(event)
@@ -259,10 +292,10 @@ class EventCallbackManager:
             log = get_logger(LOGGER_NAME)
             log.debug(
                 "%s callback %s removed.",
-                event_callback.event,
+                event_callback.maya_event,
                 event_callback.callback_name,
             )
-            signal = MayaEventManager.get_event_signal(event_callback.event)
+            signal = MayaEventManager.get_event_signal(event_callback.maya_event)
             signal.disconnect(event_callback)
             del self._CALLBACKS[callback_id]
             event_callback.deleteLater()

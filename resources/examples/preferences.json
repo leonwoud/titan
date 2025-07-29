@@ -1,0 +1,157 @@
+{
+  "component_type": "Settings",
+  "name": "settings",
+  "scope": "QtCore.QSettings.UserScope",
+  "application": "titan.test",
+  "organization": "home",
+  "children": [
+    {
+      "component_type": "Group",
+      "name": "general",
+      "label": "Interface: General Interface Preferences",
+      "collapsible": false,
+      "children": [
+        {
+          "component_type": "Tabs",
+          "name": "tabs",
+          "children": [
+            {
+              "component_type": "Tab",
+              "label": "Blah",
+              "children": [
+                {
+                  "component_type": "Field",
+                  "name": "fieldTab",
+                  "label": "Some Field",
+                  "default": "Some Value",
+                  "type": "str"
+                }
+              ]
+            },
+            {
+              "component_type": "Tab",
+              "label": "Blah 2",
+              "children": [
+                {
+                  "component_type": "Field",
+                  "name": "fieldTab2",
+                  "label": "Some Field 2",
+                  "default": "Some Value 2",
+                  "type": "str"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "component_type": "Field",
+          "name": "field",
+          "label": "String Field",
+          "type": "str",
+          "default": "hello"
+        },
+        {
+          "component_type": "Field",
+          "name": "intField",
+          "label": "Int Field",
+          "type": "int",
+          "default": 10,
+          "range": "0 10"
+        },
+        {
+          "component_type": "Field",
+          "name": "floatField",
+          "label": "Float Field",
+          "type": "float",
+          "default": 3.14,
+          "range": "-10.0 10.0"
+        },
+        {
+          "component_type": "Group",
+          "name": "home",
+          "label": "Home Screen",
+          "disable": "showHomeScreen == 0",
+          "tooltip": "this is a tooltip that we'll let run long and over multiple lines, but we need to read back as one",
+          "children": [
+            {
+              "component_type": "CheckBox",
+              "name": "showHomeScreen",
+              "label": "Show Home Screen on start up",
+              "default": true
+            },
+            {
+              "component_type": "CheckBox",
+              "name": "showHomeIcon",
+              "label": "Show Home icon in menu bar",
+              "default": false
+            },
+            {
+              "component_type": "ColorPicker",
+              "name": "colorPicker1",
+              "label": "colour",
+              "default": "255,127,80"
+            }
+          ]
+        },
+        {
+          "component_type": "CheckBox",
+          "name": "bottom",
+          "label": "Bottom Checkbox",
+          "default": false
+        },
+        {
+          "component_type": "ComboBox",
+          "name": "combo",
+          "label": "something",
+          "default": "value3",
+          "type": "str",
+          "children": [
+            {
+              "component_type": "Item",
+              "name": "value1"
+            },
+            {
+              "component_type": "Item",
+              "name": "value2 (test)"
+            },
+            {
+              "component_type": "Item",
+              "name": "value3"
+            }
+          ]
+        },
+        {
+          "component_type": "RadioButton",
+          "name": "radio",
+          "label": "Radio Buttons",
+          "default": 4,
+          "type": "int",
+          "children": [
+            {
+              "component_type": "Item",
+              "name": "2"
+            },
+            {
+              "component_type": "Item",
+              "name": "4"
+            },
+            {
+              "component_type": "Item",
+              "name": "6"
+            }
+          ]
+        },
+        {
+          "component_type": "Slider",
+          "name": "slider",
+          "label": "Slider",
+          "default": 4.5,
+          "type": "float",
+          "step": 0.1,
+          "range": "0.0 10.0",
+          "field": "right"
+        }
+      ]
+    }
+  ]
+}

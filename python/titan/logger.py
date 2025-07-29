@@ -105,7 +105,7 @@ def get_logger(name, log_level: Optional[int] = None) -> logging.Logger:
 
     # Setup the GUI Logger
     if is_qt_app():
-        model = get_logger_model()
+        model = get_logger_model(name)
         gui_handler = TitanLogHandler(model)
         # gui_formatter = logging.Formatter(
         #    "%(asctime)s : %(levelname)s : %(name)s : %(message)s"

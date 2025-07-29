@@ -1,4 +1,4 @@
-""" This module contains the main logger GUI components. 
+"""This module contains the main logger GUI components.
 
 >>> # Open a serialized log file and display it in the logger GUI
 >>> from titan.resources import find_resource
@@ -10,8 +10,10 @@
 
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Optional
+from typing import Optional, cast
 
 # Logger imports
 from .model import TitanLoggerModel, FilterProxyModel
@@ -23,40 +25,42 @@ from .io import write_records, read_records
 from titan._internal.preferences.main import PreferencesDialog
 from titan.preferences import Preferences
 from titan.qt import QtCore, QtGui, QtWidgets
+from titan.qt.compat import QAction
 from titan.resources import find_resource
 
 from titan._internal.qt.utils import (
     restore_window_size_and_position,
     store_window_size_and_position,
 )
+from titan._internal.preferences.protocols import LoggerPreferences, WindowPreferences
 
 
 # Constants
 LOGGER_MODELS: dict[str, TitanLoggerModel] = {}
 
 
-def get_logger_preferences(name) -> Preferences:
-    """Get the logger preferences for a given name."""
-    preferences_file = find_resource("logger.preferences")
-    application = f"titan.preferences.{name}"
+def get_logger_preferences(name: Optional[str] = None) -> LoggerPreferences:
+    """Get the shared logger preferences (same for all loggers)."""
+    preferences_file = find_resource("logger.json")
+    application = "titan.preferences.logger"  # Shared application name for all loggers
     preferences = Preferences.from_file(preferences_file, application=application)
-    return preferences
+    return cast(LoggerPreferences, preferences)
 
 
 def get_logger_model(
-    name: Optional[str] = None, preferences: Optional[Preferences] = None
-):
-    """Get the logger model for a given name. If the logger model already exists, return it."""
+    name: Optional[str] = None, preferences: Optional[LoggerPreferences] = None
+) -> TitanLoggerModel:
+    """Get the logger model for a given name. Each logger has its own model but shared preferences."""
 
-    # If we're not given a name, use the same root logger model
+    # If we're not given a name, use the default logger model
     if name is None:
         name = "root"
 
     if preferences is None:
-        preferences = get_logger_preferences(name)
+        preferences = get_logger_preferences()
 
     if name not in LOGGER_MODELS:
-        LOGGER_MODELS[name] = TitanLoggerModel(preferences)
+        LOGGER_MODELS[name] = TitanLoggerModel(cast(Preferences, preferences))
 
     return LOGGER_MODELS[name]
 
@@ -67,7 +71,7 @@ class LoggerWindow(QtWidgets.QMainWindow):
     ) -> None:
         super().__init__(parent=parent)
         self.setWindowTitle("Titan Logger")
-        self._preferences = get_logger_preferences(name)
+        self._preferences = get_logger_preferences()
         self._logger = LoggerWidget(name, self._preferences, self)
         self.setCentralWidget(self._logger)
         self._init_menu()
@@ -77,12 +81,41 @@ class LoggerWindow(QtWidgets.QMainWindow):
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("&File")
         edit_menu = menu_bar.addMenu("&Edit")
-        save_action = QtWidgets.QAction("&Save", self)
+        
+        # File menu actions
+        open_action = QAction("&Open...", self)
+        open_action.triggered.connect(self._on_open)
+        save_action = QAction("&Save", self)
         save_action.triggered.connect(self._on_save)
-        edit_prefs = QtWidgets.QAction("&Preferences", self)
-        edit_prefs.triggered.connect(self._on_edit_prefs)
+        
+        file_menu.addAction(open_action)
+        file_menu.addSeparator()
         file_menu.addAction(save_action)
+        
+        # Edit menu actions
+        edit_prefs = QAction("&Preferences", self)
+        edit_prefs.triggered.connect(self._on_edit_prefs)
         edit_menu.addAction(edit_prefs)
+
+    @QtCore.Slot()
+    def _on_open(self) -> None:
+        """Open a log file in a new logger window."""
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open Log File", "", "Log Files (*.dat)"
+        )
+        if file_path:
+            # Extract filename for window title and unique logger name
+            import os
+            filename = os.path.basename(file_path)
+            logger_name = f"file_{filename}"
+            
+            # Create a new logger window for this file
+            # Set parent to self to keep it alive, but with Qt.Window flag to make it independent
+            file_logger_window = LoggerWindow(name=logger_name, parent=self)
+            file_logger_window.setWindowFlags(QtCore.Qt.WindowType.Window)
+            file_logger_window.setWindowTitle(f"Titan Logger - {filename}")
+            file_logger_window.open_log(file_path)
+            file_logger_window.show()
 
     @QtCore.Slot()
     def _on_save(self) -> None:
@@ -94,7 +127,26 @@ class LoggerWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def _on_refresh_requested(self):
-        print("REFRESH PLEASE!")
+        """Refresh the logger UI when preferences change (e.g., level colors)."""
+        # Force sync of preferences to ensure we have the latest values
+        cast(Preferences, self._preferences).sync()
+        
+        # Force a complete refresh of all data in the table model
+        model = self._logger._table_model
+        view = self._logger._table_view
+        
+        if model.rowCount() > 0:
+            top_left = model.index(0, 0)
+            bottom_right = model.index(model.rowCount() - 1, model.columnCount() - 1)
+            # Emit dataChanged to force re-evaluation of all roles including colors
+            model.dataChanged.emit(top_left, bottom_right)
+        
+        # Force the view to update its display
+        view.viewport().update()
+        
+        # Also update the current level filter to reflect any preference changes  
+        current_level = cast(str, self._preferences.level.value)
+        view.set_level_filter(current_level)
 
     @QtCore.Slot()
     def _on_edit_prefs(self) -> None:
@@ -102,7 +154,9 @@ class LoggerWindow(QtWidgets.QMainWindow):
             self._prefs_widget.show()
             self._prefs_widget.raise_()
             return
-        self._prefs_widget = PreferencesDialog(self._preferences, parent=self)
+        self._prefs_widget = PreferencesDialog(
+            cast(Preferences, self._preferences), window_title="Titan Logger Preferences", parent=self
+        )
         self._prefs_widget.refresh_requested.connect(self._on_refresh_requested)
         self._prefs_widget.show()
 
@@ -113,13 +167,13 @@ class LoggerWindow(QtWidgets.QMainWindow):
     def showEvent(self, event: QtCore.QEvent) -> None:
         """Restore the window state when the logger is shown."""
         # TODO: Only do this is the window is floating, right now it will be
-        restore_window_size_and_position(self, self._preferences)
+        restore_window_size_and_position(self, cast(WindowPreferences, self._preferences))
         event.accept()
 
     def closeEvent(self, event: QtCore.QEvent) -> None:
         """Close the log records when the logger window is closed."""
         # Store the window state on close
-        store_window_size_and_position(self, self._preferences)
+        store_window_size_and_position(self, cast(WindowPreferences, self._preferences))
         self._logger.close_record_infos()
         event.accept()
 
@@ -129,15 +183,13 @@ class LoggerWidget(QtWidgets.QWidget):
     def __init__(
         self,
         name: Optional[str] = None,
-        preferences: Optional[Preferences] = None,
+        preferences: Optional[LoggerPreferences] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent=parent)
-        self._table_view = None
-        self._tabel_model = None
         self._name = name
         if preferences is None:
-            self._preferences = get_logger_preferences(name)
+            self._preferences = get_logger_preferences()
         else:
             self._preferences = preferences
         self._init_ui()
@@ -153,12 +205,12 @@ class LoggerWidget(QtWidgets.QWidget):
         self._proxy_model = FilterProxyModel(self)
         self._proxy_model.setSourceModel(self._table_model)
         self._table_view.filter_changed.connect(self._on_filter_changed)
-        self._table_view.set_level_filter(self._preferences.level.value)
+        self._table_view.set_level_filter(cast(str, self._preferences.level.value))
         self._table_view.setModel(self._proxy_model)
         layout.addWidget(self._table_view)
-        self._copy_action = QtWidgets.QAction(self)
+        self._copy_action = QAction(self)
         self._copy_action.triggered.connect(self._on_copy)
-        self._copy_action.setShortcut(QtGui.QKeySequence.Copy)
+        self._copy_action.setShortcut(QtGui.QKeySequence.StandardKey.Copy)
         self.addAction(self._copy_action)
         self.setStyleSheet("QTableView {border: 2px solid transparent;}")
 
@@ -177,6 +229,7 @@ class LoggerWidget(QtWidgets.QWidget):
             # something like "CRITICAL", but we want to store "Critical"
             # in the preferences.
             for Level in Levels:
+                # level_name is added by __new__
                 if Level.level_name == level_name:
                     self._preferences.level.value = Level.name
                     break
@@ -214,7 +267,8 @@ class LoggerWidget(QtWidgets.QWidget):
 
     def clear_log(self) -> None:
         """Clear the log records."""
-        self._table_model.clear_log()
+        # self._table_model.clear_log()  # TODO: Implement this
+        pass
 
     def close_record_infos(self) -> None:
         """Close all the record info widgets."""
